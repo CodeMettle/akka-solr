@@ -1,0 +1,14 @@
+<configuration scan="true">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <withJansi>true</withJansi>
+        <encoder>
+            <pattern>%boldYellow(%d) %magenta([%15.15X{sourceThread}]) %highlight(%-5level) %green([%30.30X{akkaSource}]) - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.github.akkasolr" level="DEBUG"/>
+
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

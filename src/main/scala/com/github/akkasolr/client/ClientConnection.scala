@@ -1,8 +1,11 @@
 package com.github.akkasolr
 package client
 
+import java.util.UUID
+
 import com.github.akkasolr.client.ClientConnection.Messages.SolrMessage
-import com.github.akkasolr.client.ClientConnection.fsm
+import com.github.akkasolr.client.ClientConnection.{InitRequestTimedOut, fsm}
+import com.github.akkasolr.client.ClientConnection.fsm.InitialRequest
 import org.apache.solr.common.params.{CommonParams, SolrParams}
 import spray.can.Http
 import spray.can.client.{HostConnectorSettings, ClientConnectionSettings}
@@ -10,6 +13,7 @@ import spray.http._
 
 import akka.actor._
 import akka.io.IO
+import scala.concurrent.duration._
 
 /**
  * @author steven
@@ -22,10 +26,10 @@ object ClientConnection {
 
     object Messages {
         sealed trait SolrMessage {
-            def query: SolrParams
+            def timeout: FiniteDuration
         }
 
-        case class Select(query: SolrParams) extends SolrMessage
+        case class Select(query: SolrParams, timeout: FiniteDuration = 1.minute) extends SolrMessage
     }
 
     object fsm {
@@ -35,8 +39,12 @@ object ClientConnection {
         case object TestingConnection extends State
         case object Connected extends State
 
-        case class CCData(hostConn: ActorRef = null, initReq: Option[(SolrMessage, ActorRef)] = None)
+        case class InitialRequest(req: SolrMessage, replyTo: ActorRef, startTime: Long = System.nanoTime(),
+                                  reqId: UUID = UUID.randomUUID)
+        case class CCData(hostConn: ActorRef = null, initReq: Option[InitialRequest] = None)
     }
+
+    private case class InitRequestTimedOut(reqId: UUID)
 }
 
 class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Stash with ActorLogging {
@@ -58,19 +66,30 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
         log.warning("Unimplemented; conn={}, req={}, reply={}", connection, request, requestor)
     }
 
+    private def serviceInitRequest(connection: ActorRef, init: InitialRequest) = {
+        val timeToConnect = System.nanoTime() - init.startTime
+        log.debug("New timeout is {}", init.req.timeout - timeToConnect.nanos)
+        serviceRequest(connection, init.req, init.replyTo)
+    }
+
     whenUnhandled {
-        case Event(Terminated(dead), data) ⇒
-            if (dead == data.hostConn) {
-                log debug "HostConnector actor died"
+        case Event(InitRequestTimedOut(reqId), data) ⇒ data.initReq match {
+            case Some(InitialRequest(_, replyTo, _, r)) if r == reqId ⇒
+                replyTo ! Status.Failure(new Http.ConnectionException("Didn't connect before request timeout"))
+                stay() using data.copy(initReq = None)
 
-                data.initReq foreach {
-                    case (_, replyTo) ⇒ replyTo !
-                        Status.Failure(new Http.ConnectionException("Connection closed while trying to establish"))
-                }
+            case _ ⇒ stay()
+        }
 
-                goto(fsm.Disconnected) using fsm.CCData()
-            } else
-                stay()
+        case Event(Terminated(dead), data) ⇒ if (dead == data.hostConn) {
+            log debug "HostConnector actor died"
+
+            data.initReq foreach (_.replyTo !
+                Status.Failure(new Http.ConnectionException("Connection closed while trying to establish")))
+
+            goto(fsm.Disconnected) using fsm.CCData()
+        } else
+            stay()
 
         case Event(_: SolrMessage, _) ⇒
             stash()
@@ -87,9 +106,7 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
         case Event(f @ Status.Failure(e: Http.ConnectionException), data) ⇒
             log.error(e, "Couldn't connect to {}", baseUri)
 
-            data.initReq foreach {
-                case (_, replyTo) ⇒ replyTo ! f
-            }
+            data.initReq foreach (_.replyTo ! f)
 
             goto(fsm.Disconnected) using fsm.CCData()
     }
@@ -99,7 +116,9 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
             IO(Http)(actorSystem) ! Http
                 .HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort, baseUri.isSsl,
                 settings = Some(hostConnSettings))
-            goto(fsm.Connecting) using data.copy(initReq = Some(m → sender()))
+            val initReq = InitialRequest(m, sender())
+            setTimer(initReq.reqId.toString, InitRequestTimedOut(initReq.reqId), m.timeout)
+            goto(fsm.Connecting) using data.copy(initReq = Some(initReq))
     }
 
     when(fsm.Connecting) (handleConnExc orElse {
@@ -121,25 +140,19 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
 
     when(fsm.TestingConnection) (handleConnExc orElse {
         case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒
-            data.initReq foreach {
-                case (req, replyTo) ⇒ serviceRequest(data.hostConn, req, replyTo)
-            }
+            data.initReq foreach (serviceInitRequest(data.hostConn, _))
 
             goto(fsm.Connected) using data.copy(initReq = None)
 
         case Event(HttpResponse(StatusCodes.NotFound, _, _, _), data) ⇒
-            data.initReq foreach {
-                case (_, replyTo) ⇒ replyTo ! Status.Failure(
-                    new Http.ConnectionException(s"$pingUri not found; is '${baseUri.path}' the correct address?"))
-            }
+            data.initReq foreach (_.replyTo ! Status.Failure(
+                new Http.ConnectionException(s"$pingUri not found; is '${baseUri.path}' the correct address?")))
 
             goto(fsm.Disconnected) using fsm.CCData()
 
         case Event(resp: HttpResponse, data) ⇒
             log.error("{}", resp)
-            data.initReq foreach {
-                case (_, replyTo) ⇒ replyTo ! Status.Failure(new Http.ConnectionException("fill this in!@!"))
-            }
+            data.initReq foreach (_.replyTo ! Status.Failure(new Http.ConnectionException("fill this in!@!")))
             goto(fsm.Disconnected) using fsm.CCData()
     })
 

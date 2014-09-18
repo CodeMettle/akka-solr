@@ -11,7 +11,7 @@ crossScalaVersions := Seq("2.10.4", "2.11.2")
 
 libraryDependencies ++= Seq(
     Deps.akkaActor,
-    Deps.solrj,
+    Deps.solrj % "provided",
     Deps.sprayCan
 )
 

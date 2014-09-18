@@ -2,6 +2,7 @@ package com.github.akkasolr.example
 
 import com.github.akkasolr.Solr
 import com.github.akkasolr.client.ClientConnection
+import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import org.apache.solr.client.solrj.SolrQuery
 
@@ -21,7 +22,7 @@ object Example extends App {
     private class MyAct extends Actor with ActorLogging {
         private var conn: ActorRef = _
 
-        private val config = context.system.settings.config.getConfig("example")
+        private val config = context.system.settings.config.as[Config]("example")
 
         override def preStart() = {
             super.preStart()
@@ -32,6 +33,12 @@ object Example extends App {
             context.system.scheduler.scheduleOnce(2.minutes, self, PoisonPill)
 
             Solr.Client.clientTo(config.as[String]("solrAddr"))
+        }
+
+        override def postStop() = {
+            super.postStop()
+
+            log info "stopping"
         }
 
         private def sendQuery() = {

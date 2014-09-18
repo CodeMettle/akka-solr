@@ -5,6 +5,7 @@ import com.github.akkasolr.client.ClientConnection.Messages.SolrMessage
 import com.github.akkasolr.client.ClientConnection.fsm
 import org.apache.solr.common.params.{CommonParams, SolrParams}
 import spray.can.Http
+import spray.can.client.{HostConnectorSettings, ClientConnectionSettings}
 import spray.http._
 
 import akka.actor._
@@ -20,7 +21,9 @@ object ClientConnection {
     }
 
     object Messages {
-        sealed trait SolrMessage
+        sealed trait SolrMessage {
+            def query: SolrParams
+        }
 
         case class Select(query: SolrParams) extends SolrMessage
     }
@@ -42,6 +45,14 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
     private val selectUri = baseUri withPath baseUri.path / "select"
     private val updateUri = baseUri withPath baseUri.path / "update"
     private val pingUri = baseUri withPath baseUri.path ++ Uri.Path(CommonParams.PING_HANDLER)
+
+    private def connSettings = {
+        ClientConnectionSettings(context.system).copy(responseChunkAggregationLimit = 0)
+    }
+
+    private def hostConnSettings = {
+        HostConnectorSettings(context.system).copy(connectionSettings = connSettings)
+    }
 
     private def serviceRequest(connection: ActorRef, request: SolrMessage, requestor: ActorRef) = {
         log.warning("Unimplemented; conn={}, req={}, reply={}", connection, request, requestor)
@@ -85,8 +96,9 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
 
     when(fsm.Disconnected) {
         case Event(m: SolrMessage, data) ⇒
-            IO(Http)(actorSystem) !
-                Http.HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort, baseUri.isSsl)
+            IO(Http)(actorSystem) ! Http
+                .HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort, baseUri.isSsl,
+                settings = Some(hostConnSettings))
             goto(fsm.Connecting) using data.copy(initReq = Some(m → sender()))
     }
 

@@ -17,7 +17,10 @@ libraryDependencies ++= Seq(
 
 libraryDependencies ++= Seq(
     Deps.akkaSlf,
-    Deps.logback
+    Deps.akkaTest,
+    Deps.guava,
+    Deps.logback,
+    Deps.scalaTest
 ) map (_ % "test")
 
 libraryDependencies += {

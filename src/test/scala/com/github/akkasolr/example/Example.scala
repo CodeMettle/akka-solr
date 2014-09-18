@@ -1,5 +1,10 @@
 package com.github.akkasolr.example
 
+import com.github.akkasolr.Solr
+import com.github.akkasolr.client.ClientConnection
+import net.ceedubs.ficus.Ficus._
+import org.apache.solr.client.solrj.SolrQuery
+
 import akka.actor._
 import scala.concurrent.duration._
 
@@ -9,44 +14,47 @@ import scala.concurrent.duration._
  */
 object Example extends App {
     val system = ActorSystem("Example")
-    import com.github.akkasolr.example.Example.system.dispatcher
 
-    val act = system.actorOf(Props[Actor](new Actor with ActorLogging {
+    val main = system.actorOf(Props[MyAct])
+    system.actorOf(Props[WD])
 
-        override def postStop() = {
-            super.postStop()
+    private class MyAct extends Actor with ActorLogging {
+        private var conn: ActorRef = _
 
-            context.system.shutdown()
+        private val config = context.system.settings.config.getConfig("example")
+
+        override def preStart() = {
+            super.preStart()
+
+            import context.dispatcher
+
+            context.system.scheduler.scheduleOnce(35.seconds, self, 'q)
+            context.system.scheduler.scheduleOnce(2.minutes, self, PoisonPill)
+
+            Solr.Client.clientTo(config.as[String]("solrAddr"))
         }
 
-        private def doit() = {
-            log debug "starting child"
-
-            val c = context.actorOf(Props[Actor](new Actor with ActorLogging {
-                override def preStart() = {
-                    super.preStart()
-
-                    context.system.scheduler.scheduleOnce(500.millis, self, PoisonPill)
-
-                    log info "child started"
-                }
-
-                def receive = Actor.emptyBehavior
-            }), "child")
-
-            context watch c
+        private def sendQuery() = {
+            conn ! ClientConnection.Messages.Select(new SolrQuery(config.as[String]("testQuery")))
         }
 
         def receive = {
-            case 'doit ⇒
-                log info "This is something happening"
-                doit()
+            case Solr.SolrConnection(a, c) ⇒
+                log.info("Got {} for {} from {}", c, a, sender())
+                conn = sender()
+                sendQuery()
 
-            case Terminated(_) ⇒
-                log debug "child died, shutting down"
-                context.system.scheduler.scheduleOnce(500.millis, self, PoisonPill)
+            case 'q ⇒ sendQuery()
+
+            case m ⇒
+                log.info("got {}", m)
         }
-    }), "testActor")
+    }
 
-    system.scheduler.scheduleOnce(500.millis, act, 'doit)
+    private class WD extends Actor {
+        context watch main
+        def receive = {
+            case Terminated(`main`) ⇒ system.shutdown()
+        }
+    }
 }

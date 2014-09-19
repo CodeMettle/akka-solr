@@ -8,6 +8,7 @@
 package com.codemettle.akkasolr
 package client
 
+import org.apache.solr.client.solrj.response.QueryResponse
 import spray.can.Http
 import spray.can.client.{ClientConnectionSettings, HostConnectorSettings}
 import spray.http._
@@ -132,6 +133,10 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             val exc = new Http.ConnectionException("No response to server pings")
             stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
             goto(fsm.Disconnected) using fsm.CCData()
+
+        case Event(qr: QueryResponse, _) ⇒
+            log.debug("replace this later; {}", qr)
+            goto(fsm.Connected)
 
         case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒ goto(fsm.Connected)
 

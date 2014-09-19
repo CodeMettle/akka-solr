@@ -6,7 +6,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.github.akkasolr" level="DEBUG"/>
+    <logger name="com.codemettle.akkasolr" level="DEBUG"/>
 
     <root level="info">
         <appender-ref ref="STDOUT"/>

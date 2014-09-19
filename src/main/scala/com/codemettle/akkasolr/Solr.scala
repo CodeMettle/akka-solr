@@ -48,5 +48,5 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
     case class InvalidResponse(msg: String) extends Exception(s"Couldn't handle response: $msg") with NoStackTrace
 
-    case class ParseError(t: Throwable) extends Exception("Error parsing response", t) with NoStackTrace
+    case class ParseError(t: Throwable) extends Exception(s"Error parsing response: ${t.getMessage}") with NoStackTrace
 }

@@ -1,7 +1,6 @@
 package com.github.akkasolr.example
 
 import com.github.akkasolr.Solr
-import com.github.akkasolr.client.ClientConnection
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import org.apache.solr.client.solrj.SolrQuery
@@ -42,7 +41,7 @@ object Example extends App {
         }
 
         private def sendQuery() = {
-            conn ! ClientConnection.Messages.Select(new SolrQuery(config.as[String]("testQuery")))
+            conn ! Solr.Select(new SolrQuery(config.as[String]("testQuery")))
         }
 
         def receive = {

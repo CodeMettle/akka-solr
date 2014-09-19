@@ -1,4 +1,5 @@
-package com.github.akkasolr.util
+package com.github.akkasolr
+package util
 
 import java.io.{ByteArrayOutputStream, InputStream}
 
@@ -6,7 +7,7 @@ import com.github.akkasolr.util.ActorInputStream._
 
 import akka.actor._
 import akka.pattern._
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import scala.compat.Platform
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -16,13 +17,13 @@ import scala.concurrent.duration._
  *
  */
 object ActorInputStream {
-    private case class EnqueueBytes(bytes: Array[Byte])
+    private case class EnqueueBytes(bytes: ByteString)
     private case object TriggerStreamComplete
     private case class DequeueBytes(max: Int)
-    private case class DequeuedBytes(bytes: Option[Array[Byte]])
+    private case class DequeuedBytes(bytes: Option[ByteString])
 
     private class ByteBuffer extends Actor with Stash {
-        private val baos = new ByteArrayOutputStream
+        private var byteStr = ByteString.empty
         private var finished = false
 
         def receive = {
@@ -31,40 +32,34 @@ object ActorInputStream {
                 unstashAll()
 
             case EnqueueBytes(bytes) ⇒
-                baos write bytes
+                byteStr ++= bytes
                 unstashAll()
 
             case DequeueBytes(max) ⇒
-                if (baos.size() == 0 && finished)
+                if (byteStr.isEmpty && finished)
                     sender() ! DequeuedBytes(None)
-                else if (baos.size() == 0)
+                else if (byteStr.isEmpty)
                     stash()
-                else {
-                    val bytes = baos.toByteArray
-                    baos.reset()
-
-                    if (bytes.length <= max)
-                        sender() ! DequeuedBytes(Some(bytes))
-                    else {
-                        val bytesToSend = new Array[Byte](max)
-                        Platform.arraycopy(bytes, 0, bytesToSend, 0, max)
-
-                        sender() ! DequeuedBytes(Some(bytesToSend))
-
-                        baos.write(bytes, max, bytes.length - max)
-                    }
+                else if (byteStr.size <= max) {
+                    sender() ! DequeuedBytes(Some(byteStr))
+                    byteStr = ByteString.empty
+                } else {
+                    val (toSend, toKeep) = byteStr splitAt max
+                    sender() ! DequeuedBytes(Some(toSend))
+                    byteStr = toKeep
                 }
         }
     }
 }
 
-class ActorInputStream(arf: ActorRefFactory) extends InputStream {
+class ActorInputStream(implicit arf: ActorRefFactory) extends InputStream {
     private implicit val timeout = Timeout(90.seconds)
     private val buffer = arf.actorOf(Props[ByteBuffer])
+    private val log = akka.event.Logging.getLogger(actorSystem, this)
 
     def streamFinished() = buffer ! TriggerStreamComplete
 
-    def enqueueBytes(bytes: Array[Byte]) = buffer ! EnqueueBytes(bytes)
+    def enqueueBytes(bytes: ByteString) = buffer ! EnqueueBytes(bytes)
 
     override def close(): Unit = buffer ! PoisonPill
 
@@ -74,6 +69,7 @@ class ActorInputStream(arf: ActorRefFactory) extends InputStream {
     }
 
     override def read(b: Array[Byte], off: Int, len: Int): Int = {
+        log.debug("reading {} bytes", len)
         if (b == null)
             throw new NullPointerException
         else if (off < 0 || len < 0 || len > b.length - off)
@@ -83,7 +79,9 @@ class ActorInputStream(arf: ActorRefFactory) extends InputStream {
         else {
             Await.result(buffer ? DequeueBytes(len), Duration.Inf) match {
                 case DequeuedBytes(None) ⇒ -1
-                case DequeuedBytes(Some(bytes)) ⇒
+                case DequeuedBytes(Some(byteStr)) ⇒
+                    log.debug("got {} bytes", byteStr.size)
+                    val bytes = byteStr.toArray
                     Platform.arraycopy(bytes, 0, b, off, bytes.length)
                     bytes.length
             }

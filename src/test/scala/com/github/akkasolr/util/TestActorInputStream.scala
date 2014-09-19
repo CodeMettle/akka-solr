@@ -7,6 +7,7 @@ import org.scalatest._
 
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
+import akka.util.ByteString
 import scala.compat.Platform
 import scala.concurrent.{ExecutionContext, blocking, Future}
 import scala.util.Random
@@ -30,7 +31,7 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
         b
     }
 
-    def newStream = new ActorInputStream(system)
+    def newStream = new ActorInputStream
 
     "An ActorInputStream" should "successfully eof" in {
         val ais = newStream
@@ -47,7 +48,7 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
 
         val ais = newStream
 
-        ais enqueueBytes rand
+        ais enqueueBytes ByteString(rand)
         ais.streamFinished()
 
         val out = readFully(ais)
@@ -73,7 +74,7 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
                 val count = bais.read(buf, 0, toread)
                 val toenqueue = new Array[Byte](count)
                 Platform.arraycopy(buf, 0, toenqueue, 0, count)
-                ais.enqueueBytes(toenqueue)
+                ais enqueueBytes ByteString(toenqueue)
                 Thread.sleep(250)
             }
             ais.streamFinished()

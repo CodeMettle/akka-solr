@@ -1,6 +1,6 @@
 package com.github.akkasolr.client
 
-import com.github.akkasolr.client.ClientConnection.Messages.SolrMessage
+import com.github.akkasolr.Solr.SolrOperation
 import com.github.akkasolr.client.ConnectingStasher._
 import spray.can.Http
 
@@ -16,12 +16,12 @@ object ConnectingStasher {
         Props[ConnectingStasher]
     }
 
-    private[client] case class WaitingRequest(sender: ActorRef, req: SolrMessage, timeout: FiniteDuration,
+    private[client] case class WaitingRequest(sender: ActorRef, req: SolrOperation, timeout: FiniteDuration,
                                               recvdTime: Long = System.nanoTime())
 
     private[client] case object FlushWaitingRequests
 
-    private[client] case class StashedRequest(sender: ActorRef, req: SolrMessage, remainingTimeout: FiniteDuration)
+    private[client] case class StashedRequest(sender: ActorRef, req: SolrOperation, remainingTimeout: FiniteDuration)
 
     private[client] case class ErrorOutAllWaiting(err: Throwable)
 

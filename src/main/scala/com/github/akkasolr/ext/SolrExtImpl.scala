@@ -17,6 +17,8 @@ object SolrExtImpl {
 class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     private val manager = eas.actorOf(Manager.props, "Solr")
 
+    val responseParserDispatcher = eas.dispatchers lookup "akka.solr.response-parser-dispatcher"
+
     def clientTo(solrUrl: String)(implicit requestor: ActorRef) = {
         val uri = Util normalize solrUrl
         uri.scheme match {

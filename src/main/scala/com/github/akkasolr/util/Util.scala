@@ -2,6 +2,8 @@ package com.github.akkasolr.util
 
 import spray.http.Uri
 
+import akka.util.Helpers
+
 /**
  * @author steven
  *
@@ -13,5 +15,9 @@ object Util {
             u withPath u.path.reverse.tail.reverse
         else
             u
+    }
+
+    def actorNamer(prefix: String) = {
+        (LongIterator from 0) map (i ⇒ s"$prefix${Helpers.base64(i)}")
     }
 }

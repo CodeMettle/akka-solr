@@ -1,14 +1,11 @@
 package com.github.akkasolr
 package client
 
-import java.util.UUID
-
 import com.github.akkasolr.client.ClientConnection.Messages.SolrMessage
-import com.github.akkasolr.client.ClientConnection.{InitRequestTimedOut, fsm}
-import com.github.akkasolr.client.ClientConnection.fsm.InitialRequest
+import com.github.akkasolr.client.ClientConnection.fsm
 import org.apache.solr.common.params.{CommonParams, SolrParams}
 import spray.can.Http
-import spray.can.client.{HostConnectorSettings, ClientConnectionSettings}
+import spray.can.client.{ClientConnectionSettings, HostConnectorSettings}
 import spray.http._
 
 import akka.actor._
@@ -39,20 +36,18 @@ object ClientConnection {
         case object TestingConnection extends State
         case object Connected extends State
 
-        case class InitialRequest(req: SolrMessage, replyTo: ActorRef, startTime: Long = System.nanoTime(),
-                                  reqId: UUID = UUID.randomUUID)
-        case class CCData(hostConn: ActorRef = null, initReq: Option[InitialRequest] = None)
+        case class CCData(hostConn: ActorRef = null)
     }
-
-    private case class InitRequestTimedOut(reqId: UUID)
 }
 
-class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Stash with ActorLogging {
+class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with ActorLogging {
     startWith(fsm.Disconnected, fsm.CCData())
 
     private val selectUri = baseUri withPath baseUri.path / "select"
     private val updateUri = baseUri withPath baseUri.path / "update"
     private val pingUri = baseUri withPath baseUri.path ++ Uri.Path(CommonParams.PING_HANDLER)
+
+    private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
 
     private def connSettings = {
         ClientConnectionSettings(context.system).copy(responseChunkAggregationLimit = 0)
@@ -62,63 +57,54 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
         HostConnectorSettings(context.system).copy(connectionSettings = connSettings)
     }
 
-    private def serviceRequest(connection: ActorRef, request: SolrMessage, requestor: ActorRef) = {
-        log.warning("Unimplemented; conn={}, req={}, reply={}", connection, request, requestor)
-    }
-
-    private def serviceInitRequest(connection: ActorRef, init: InitialRequest) = {
-        val timeToConnect = System.nanoTime() - init.startTime
-        log.debug("New timeout is {}", init.req.timeout - timeToConnect.nanos)
-        serviceRequest(connection, init.req, init.replyTo)
+    private def serviceRequest(request: SolrMessage, requestor: ActorRef, timeout: FiniteDuration) = {
+        log.warning("Unimplemented; conn={}, req={}, reply={}", stateData.hostConn, request, requestor)
     }
 
     whenUnhandled {
-        case Event(InitRequestTimedOut(reqId), data) ⇒ data.initReq match {
-            case Some(InitialRequest(_, replyTo, _, r)) if r == reqId ⇒
-                replyTo ! Status.Failure(new Http.ConnectionException("Didn't connect before request timeout"))
-                stay() using data.copy(initReq = None)
-
-            case _ ⇒ stay()
-        }
-
         case Event(Terminated(dead), data) ⇒ if (dead == data.hostConn) {
             log debug "HostConnector actor died"
 
-            data.initReq foreach (_.replyTo !
-                Status.Failure(new Http.ConnectionException("Connection closed while trying to establish")))
+            val exc = new Http.ConnectionException("Connection closed while trying to establish")
+            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
 
             goto(fsm.Disconnected) using fsm.CCData()
         } else
             stay()
 
-        case Event(_: SolrMessage, _) ⇒
-            stash()
+        case Event(req: SolrMessage, _) ⇒
+            stasher ! ConnectingStasher.WaitingRequest(sender(), req, req.timeout)
+            stay()
+
+        case Event(ConnectingStasher.StashedRequest(act, req, remainingTimeout), _) ⇒
+            // if we get this message, it means that we successfully connected, asked for stashed connections, and
+            // then got disconnected before processing them all
+            stasher ! ConnectingStasher.WaitingRequest(act, req, remainingTimeout)
             stay()
 
         case Event(m, data) ⇒
-            val initReqSet = if (data.initReq.isDefined) "exists" else "does not exist"
             val connected = if (data.hostConn != null) "established" else "not established"
-            log.warning("Unhandled message, initial request {}; connection {}; message: {}", initReqSet, connected, m)
+            log.warning("Unhandled message, connection {}; message: {}", connected, m)
             stay()
     }
 
     private def handleConnExc: StateFunction = {
-        case Event(f @ Status.Failure(e: Http.ConnectionException), data) ⇒
+        case Event(Status.Failure(e: Http.ConnectionException), data) ⇒
             log.error(e, "Couldn't connect to {}", baseUri)
 
-            data.initReq foreach (_.replyTo ! f)
+            stasher ! ConnectingStasher.ErrorOutAllWaiting(e)
 
             goto(fsm.Disconnected) using fsm.CCData()
     }
 
     when(fsm.Disconnected) {
         case Event(m: SolrMessage, data) ⇒
-            IO(Http)(actorSystem) ! Http
-                .HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort, baseUri.isSsl,
-                settings = Some(hostConnSettings))
-            val initReq = InitialRequest(m, sender())
-            setTimer(initReq.reqId.toString, InitRequestTimedOut(initReq.reqId), m.timeout)
-            goto(fsm.Connecting) using data.copy(initReq = Some(initReq))
+            IO(Http)(actorSystem) ! Http.HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort,
+                baseUri.isSsl/*, settings = Some(hostConnSettings)*/)
+
+            stasher ! ConnectingStasher.WaitingRequest(sender(), m, m.timeout)
+
+            goto(fsm.Connecting) using fsm.CCData()
     }
 
     when(fsm.Connecting) (handleConnExc orElse {
@@ -131,39 +117,37 @@ class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with Sta
     })
 
     onTransition {
-        case fsm.Connecting -> fsm.Disconnected ⇒
-            unstashAll()
-
-        case fsm.Connecting -> fsm.TestingConnection ⇒
-            nextStateData.hostConn ! HttpRequest(HttpMethods.GET, pingUri)
+        case fsm.Connecting -> fsm.TestingConnection ⇒ nextStateData.hostConn ! HttpRequest(HttpMethods.GET, pingUri)
     }
 
     when(fsm.TestingConnection) (handleConnExc orElse {
-        case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒
-            data.initReq foreach (serviceInitRequest(data.hostConn, _))
-
-            goto(fsm.Connected) using data.copy(initReq = None)
+        case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒ goto(fsm.Connected)
 
         case Event(HttpResponse(StatusCodes.NotFound, _, _, _), data) ⇒
-            data.initReq foreach (_.replyTo ! Status.Failure(
-                new Http.ConnectionException(s"$pingUri not found; is '${baseUri.path}' the correct address?")))
+            val exc = new Http.ConnectionException(s"$pingUri not found; is '${baseUri.path}' the correct address?")
+
+            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
 
             goto(fsm.Disconnected) using fsm.CCData()
 
         case Event(resp: HttpResponse, data) ⇒
             log.error("{}", resp)
-            data.initReq foreach (_.replyTo ! Status.Failure(new Http.ConnectionException("fill this in!@!")))
+            val exc = new Http.ConnectionException("fill this in!@!")
+            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
             goto(fsm.Disconnected) using fsm.CCData()
     })
 
     onTransition {
-        case fsm.TestingConnection -> _ ⇒
-            unstashAll()
+        case fsm.TestingConnection -> fsm.Connected ⇒ stasher ! ConnectingStasher.FlushWaitingRequests
     }
 
     when(fsm.Connected) {
         case Event(m: SolrMessage, data) ⇒
-            serviceRequest(data.hostConn, m, sender())
+            serviceRequest(m, sender(), m.timeout)
+            stay()
+
+        case Event(ConnectingStasher.StashedRequest(act, req, remaining), data) ⇒
+            serviceRequest(req, act, remaining)
             stay()
     }
 

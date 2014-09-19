@@ -2,8 +2,7 @@ package com.github
 
 import spray.http.Uri
 
-import akka.actor.{ExtendedActorSystem, ActorContext, ActorRefFactory}
-import scala.annotation.tailrec
+import akka.actor.ActorRefFactory
 
 /**
  * @author steven
@@ -15,10 +14,5 @@ package object akkasolr {
         def host = u.authority
     }
 
-    @tailrec
-    def actorSystem(implicit arf: ActorRefFactory): ExtendedActorSystem = arf match {
-        case x: ActorContext ⇒ actorSystem(x.system)
-        case x: ExtendedActorSystem ⇒ x
-        case _ ⇒ throw new IllegalArgumentException(s"Unsupported ActorRefFactory implementation: $arf")
-    }
+    def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem
 }

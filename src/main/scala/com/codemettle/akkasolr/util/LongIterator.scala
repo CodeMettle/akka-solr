@@ -19,7 +19,8 @@ import scala.collection.{AbstractIterator, Iterator}
 object LongIterator {
     def from(start: Long): Iterator[Long] = from(start, 1)
 
-    def from(start: Long, step: Long): Iterator[Long] = new AbstractIterator[Long] {
+    // AbstractIterator is private in 2.10
+    def from(start: Long, step: Long): Iterator[Long] = new /*Abstract*/Iterator[Long] {
         private var i = start
         def hasNext: Boolean = true
         def next(): Long = { val result = i; i += step; result }

@@ -1,9 +1,17 @@
-package com.github.akkasolr.example
+/*
+ * Example.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.example
 
-import com.github.akkasolr.Solr
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import org.apache.solr.client.solrj.SolrQuery
+
+import com.codemettle.akkasolr.Solr
 
 import akka.actor._
 import scala.concurrent.duration._

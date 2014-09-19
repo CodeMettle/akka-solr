@@ -1,8 +1,16 @@
-package com.github.akkasolr.client
+/*
+ * ConnectingStasher.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.client
 
-import com.github.akkasolr.Solr.SolrOperation
-import com.github.akkasolr.client.ConnectingStasher._
 import spray.can.Http
+
+import com.codemettle.akkasolr.Solr.SolrOperation
+import com.codemettle.akkasolr.client.ConnectingStasher._
 
 import akka.actor._
 import scala.concurrent.duration._

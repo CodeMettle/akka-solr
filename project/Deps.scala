@@ -1,3 +1,11 @@
+/*
+ * Deps.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+
 import sbt._
 
 object Deps {

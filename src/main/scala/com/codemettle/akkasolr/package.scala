@@ -1,4 +1,11 @@
-package com.github
+/*
+ * package.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle
 
 import org.apache.solr.common.params.CommonParams
 import spray.http.Uri

@@ -1,9 +1,16 @@
-package com.github.akkasolr
+/*
+ * ActorInputStream.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr
 package util
 
-import java.io.{ByteArrayOutputStream, InputStream}
+import java.io.InputStream
 
-import com.github.akkasolr.util.ActorInputStream._
+import com.codemettle.akkasolr.util.ActorInputStream._
 
 import akka.actor._
 import akka.pattern._

@@ -1,12 +1,20 @@
-package com.github.akkasolr.manager
+/*
+ * Manager.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.manager
 
-import com.github.akkasolr.Solr
-import com.github.akkasolr.client.ClientConnection
-import com.github.akkasolr.manager.Manager.Messages.ClientTo
-import com.github.akkasolr.manager.Manager.connName
 import spray.http.Uri
 
-import akka.actor.{ActorRef, Props, Actor}
+import com.codemettle.akkasolr.Solr
+import com.codemettle.akkasolr.client.ClientConnection
+import com.codemettle.akkasolr.manager.Manager.Messages.ClientTo
+import com.codemettle.akkasolr.manager.Manager.connName
+
+import akka.actor.{Actor, ActorRef, Props}
 
 /**
  * @author steven

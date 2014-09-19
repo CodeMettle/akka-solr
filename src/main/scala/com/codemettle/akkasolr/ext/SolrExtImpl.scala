@@ -1,8 +1,15 @@
-package com.github.akkasolr.ext
+/*
+ * SolrExtImpl.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.ext
 
-import com.github.akkasolr.ext.SolrExtImpl.scheme
-import com.github.akkasolr.manager.Manager
-import com.github.akkasolr.util.Util
+import com.codemettle.akkasolr.ext.SolrExtImpl.scheme
+import com.codemettle.akkasolr.manager.Manager
+import com.codemettle.akkasolr.util.Util
 
 import akka.actor.{ActorRef, ExtendedActorSystem, Extension}
 

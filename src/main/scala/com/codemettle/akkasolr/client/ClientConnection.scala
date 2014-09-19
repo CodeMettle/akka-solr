@@ -1,11 +1,19 @@
-package com.github.akkasolr
+/*
+ * ClientConnection.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr
 package client
 
-import com.github.akkasolr.Solr.SolrOperation
-import com.github.akkasolr.client.ClientConnection.fsm
 import spray.can.Http
 import spray.can.client.{ClientConnectionSettings, HostConnectorSettings}
 import spray.http._
+
+import com.codemettle.akkasolr.Solr.SolrOperation
+import com.codemettle.akkasolr.client.ClientConnection.fsm
 
 import akka.actor._
 import akka.io.IO

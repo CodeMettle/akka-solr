@@ -1,7 +1,15 @@
-package com.github.akkasolr
+/*
+ * Solr.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr
 
-import com.github.akkasolr.ext.SolrExtImpl
 import org.apache.solr.common.params.SolrParams
+
+import com.codemettle.akkasolr.ext.SolrExtImpl
 
 import akka.actor._
 import scala.concurrent.duration._

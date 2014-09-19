@@ -1,4 +1,11 @@
-package com.github.akkasolr.util
+/*
+ * Util.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.util
 
 import spray.http.Uri
 

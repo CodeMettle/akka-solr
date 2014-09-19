@@ -1,15 +1,23 @@
-package com.github.akkasolr
+/*
+ * RequestHandler.scala
+ *
+ * Updated: Sep 19, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr
 package client
 
-import com.github.akkasolr.Solr.SolrOperation
-import com.github.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
-import com.github.akkasolr.util.ActorInputStream
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.util.NamedList
 import spray.http.Uri.Query
 import spray.http._
+
+import com.codemettle.akkasolr.Solr.SolrOperation
+import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
+import com.codemettle.akkasolr.util.ActorInputStream
 
 import akka.actor._
 import akka.pattern._

@@ -1,7 +1,7 @@
 /*
  * Example.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Sep 22, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -49,7 +49,8 @@ object Example extends App {
         }
 
         private def sendQuery() = {
-            conn ! Solr.Select(new SolrQuery(config.as[String]("testQuery")))
+            val query = Solr createQuery (Solr.queryBuilder rawQuery config.as[String]("testQuery")) rows 10000
+            conn ! Solr.Select(query.toParams)
         }
 
         def receive = {

@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Sep 22, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -11,15 +11,16 @@ package client
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.client.solrj.util.ClientUtils
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.util.NamedList
 import spray.can.Http
-import spray.http.Uri.Query
 import spray.http._
 
 import com.codemettle.akkasolr.Solr.SolrOperation
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
-import com.codemettle.akkasolr.util.ActorInputStream
+import com.codemettle.akkasolr.util.Util.RichSolrParams
+import com.codemettle.akkasolr.util.{Util, ActorInputStream}
 
 import akka.actor._
 import akka.pattern._
@@ -72,7 +73,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         case Solr.Ping(action, _) ⇒
             val p = new /*Binary*/XMLResponseParser
 
-            val baseQuery = Query(
+            val baseQuery = Uri.Query(
                 CommonParams.VERSION → p.getVersion,
                 CommonParams.WT      → p.getWriterType
             )
@@ -83,6 +84,21 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
             }
 
             HttpRequest(HttpMethods.GET, baseUri.pingUri withQuery query)
+
+        case Solr.Select(params, _) ⇒
+            val p = new /*XML*/BinaryResponseParser
+
+            val baseQuery = Uri.Query(
+                CommonParams.VERSION → p.getVersion,
+                CommonParams.WT → p.getWriterType
+            )
+
+            val query = (CommonParams.VERSION → p.getVersion) +: ((CommonParams.WT → p.getWriterType) +: params.toQuery)
+
+            //HttpRequest(HttpMethods.GET, baseUri.selectUri withQuery query)
+            HttpRequest(HttpMethods.POST, baseUri.selectUri,
+                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
+                    query.toString()))
     }
 
     private def getContentType(implicit resp: HttpResponse) = {
@@ -106,7 +122,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     def receive = {
         case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.timeout))
 
-        /* // tested with binary response and it is smaller but for whatever reason the server doesn't chunk it; prolly should stick with XML...
+        /* // tested with binary response and it is smaller but for whatever reason the server doesn't chunk it; prolly should stick with XML... */
         case resp: HttpResponse ⇒
             log.debug("got non-chunked response: {}", resp)
             resp.entity.data match {
@@ -121,7 +137,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
                 case _ ⇒ sendError(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
             }
-        */
+        /**/
 
         case ChunkedResponseStart(resp) ⇒
             log.debug("response started: {}", resp)

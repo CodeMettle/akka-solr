@@ -1,7 +1,7 @@
 /*
  * ClientConnection.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Sep 22, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -15,6 +15,7 @@ import spray.http._
 
 import com.codemettle.akkasolr.Solr.SolrOperation
 import com.codemettle.akkasolr.client.ClientConnection.fsm
+import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
 import akka.io.IO
@@ -45,6 +46,8 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
 
+    private val actorName = Util actorNamer "request"
+
     private def connSettings = {
         ClientConnectionSettings(context.system).copy(responseChunkAggregationLimit = 0)
     }
@@ -53,8 +56,15 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
         HostConnectorSettings(context.system).copy(connectionSettings = connSettings)
     }
 
-    private def serviceRequest(request: SolrOperation, requestor: ActorRef, timeout: FiniteDuration) = {
-        log.warning("Unimplemented; conn={}, req={}, reply={}", stateData.hostConn, request, requestor)
+    private def serviceRequest(hostConn: ActorRef, request: SolrOperation, requestor: ActorRef,
+                               timeout: FiniteDuration) = {
+        //log.warning("Unimplemented; conn={}, req={}, reply={}", stateData.hostConn, request, requestor)
+        context.actorOf(RequestHandler.props(baseUri, hostConn, requestor, request, timeout), actorName.next())
+    }
+
+    private def pingServer(hostConn: ActorRef) = {
+        val req = Solr.Ping()
+        serviceRequest(hostConn, req, self, req.timeout)
     }
 
     whenUnhandled {
@@ -113,19 +123,13 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
     })
 
     onTransition {
-        case fsm.Connecting -> fsm.TestingConnection ⇒
-            /*
-            nextStateData.hostConn ! HttpRequest(HttpMethods.GET, pingUri)
-            */
-            val blahreq = Solr.Ping()
-            val blah = context.actorOf(RequestHandler.props(baseUri, nextStateData.hostConn, self, blahreq, blahreq.timeout))
+        case fsm.Connecting -> fsm.TestingConnection ⇒ pingServer(nextStateData.hostConn)
     }
 
     when(fsm.TestingConnection) (handleConnExc orElse {
         case Event(Status.Failure(Solr.RequestTimedOut(_)), data) if data.pingTriesRemaining > 0 ⇒
             log debug "didn't get response from server ping, retrying"
-            val blahreq = Solr.Ping()
-            val blah = context.actorOf(RequestHandler.props(baseUri, data.hostConn, self, blahreq, blahreq.timeout))
+            pingServer(data.hostConn)
             stay() using data.copy(pingTriesRemaining = data.pingTriesRemaining - 1)
 
         case Event(Status.Failure(Solr.RequestTimedOut(_)), _) ⇒
@@ -135,7 +139,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             goto(fsm.Disconnected) using fsm.CCData()
 
         case Event(qr: QueryResponse, _) ⇒
-            log.debug("replace this later; {}", qr)
+            log.debug("replace this later; connected; {}", qr)
             goto(fsm.Connected)
 
         case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒ goto(fsm.Connected)
@@ -162,11 +166,11 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     when(fsm.Connected) {
         case Event(m: SolrOperation, data) ⇒
-            serviceRequest(m, sender(), m.timeout)
+            serviceRequest(data.hostConn, m, sender(), m.timeout)
             stay()
 
         case Event(ConnectingStasher.StashedRequest(act, req, remaining), data) ⇒
-            serviceRequest(req, act, remaining)
+            serviceRequest(data.hostConn, req, act, remaining)
             stay()
     }
 

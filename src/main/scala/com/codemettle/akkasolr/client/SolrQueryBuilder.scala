@@ -1,0 +1,184 @@
+/*
+ * SolrQueryBuilder.scala
+ *
+ * Updated: Sep 22, 2014
+ *
+ * Copyright (c) 2014, CodeMettle
+ */
+package com.codemettle.akkasolr.client
+
+import java.{util => ju}
+
+import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrQuery.SortClause
+import org.apache.solr.common.params.SolrParams
+
+import com.codemettle.akkasolr.client.SolrQueryBuilder.ImmutableSolrParams
+
+import scala.collection.JavaConverters._
+import scala.collection.immutable.HashMap
+import scala.concurrent.duration.{Duration, FiniteDuration}
+
+/**
+ * An (incomplete) immutable builder for Solr queries. Currently only has common
+ * [[org.apache.solr.client.solrj.SolrQuery]] shortcuts, but more can be added easily as the need arises.
+ *
+ * === Sample Usage ===
+ *
+ * {{{
+ *     import com.codemettle.akkasolr.client.SolrQueryBuilder.FieldStrToSort
+ *
+ *     val b = SolrQueryBuilder("*") rows 21 fields "field" sortBy "myfield".desc
+ *     val b2 = b facets "facetfield"
+ *     query(b.toParams)
+ *     query(b2.toParams)
+ * }}}
+ *
+ * @author steven
+ */
+@SerialVersionUID(1L)
+case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
+                            fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
+                            facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None) {
+    /*** builder shortcuts ***/
+
+    def withQuery(q: String) = copy(query = q)
+
+    def rows(r: Int) = copy(rowsOpt = Some(r))
+
+    def withoutRows() = copy(rowsOpt = None)
+
+    def start(s: Int) = copy(startOpt = Some(s))
+
+    def withoutStart() = copy(startOpt = None)
+
+    def fields(fs: Iterable[String]) = copy(fieldList = fs.toVector)
+
+    def fields(fs: String*) = copy(fieldList = fs.toVector)
+
+    def withField(f: String) = if (fieldList.contains(f)) this else copy(fieldList = fieldList :+ f)
+
+    def withFields(fs: Iterable[String]): SolrQueryBuilder = withFields(fs.toSeq: _*)
+
+    def withFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withField f }
+
+    def withoutField(f: String) = if (fieldList.contains(f)) copy(fieldList = fieldList filterNot (_ == f)) else this
+
+    def withoutFields(fs: Iterable[String]): SolrQueryBuilder = withoutFields(fs.toSeq: _*)
+
+    def withoutFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutField f}
+
+    def withoutFields() = if (fieldList.isEmpty) this else copy(fieldList = Vector.empty)
+
+    def sortBy(sc: SortClause) = copy(sortsList = Vector(sc))
+
+    def sortBy(scs: Iterable[SortClause]) = copy(sortsList = scs.toVector)
+
+    def sortBy(scs: SortClause*) = copy(sortsList = scs.toVector)
+
+    def withSort(sc: SortClause) = sortsList indexWhere (_.getItem == sc.getItem) match {
+        case idx if idx < 0 ⇒ copy(sortsList = sortsList :+ sc)
+        case idx ⇒ copy(sortsList = sortsList updated (idx, sc))
+    }
+
+    def withSorts(scs: Iterable[SortClause]): SolrQueryBuilder = withSorts(scs.toSeq: _*)
+
+    def withSorts(scs: SortClause*) = (this /: scs) { case (sqc, sc) ⇒ sqc withSort sc }
+
+    def withoutSortField(f: String) = copy(sortsList = sortsList filterNot (_.getItem == f))
+
+    def withoutSort(sc: SortClause) = copy(sortsList = sortsList filterNot (_ == sc))
+
+    def withoutSorts() = if (sortsList.isEmpty) this else copy(sortsList = Vector.empty)
+
+    def facets(fs: Iterable[String]): SolrQueryBuilder = facets(fs.toSeq: _*)
+
+    def facets(fs: String*) = copy(facetFields = fs.toVector)
+
+    def withFacetField(f: String) = if (facetFields.contains(f)) this else copy(facetFields = facetFields :+ f)
+
+    def withFacetFields(fs: Iterable[String]): SolrQueryBuilder = withFacetFields(fs.toSeq: _*)
+
+    def withFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withFacetField f }
+
+    def withoutFacetField(f: String) = if (facetFields.contains(f)) copy(facetFields = facetFields filterNot (_ == f)) else this
+
+    def withoutFacetFields(fs: Iterable[String]): SolrQueryBuilder = withoutFacetFields(fs.toSeq: _*)
+
+    def withoutFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutFacetField f }
+
+    def withoutFacetFields() = if (facetFields.isEmpty) this else copy(facetFields = Vector.empty)
+
+    def allowedExecutionTime(millis: Int) = copy(serverTimeAllowed = Some(millis))
+
+    def allowedExecutionTime(duration: FiniteDuration) = duration.toMillis match {
+        case ms if ms > Int.MaxValue ⇒ throw new IllegalArgumentException("Execution time too large")
+        case ms ⇒ copy(serverTimeAllowed = Some(ms.toInt))
+    }
+
+    def allowedExecutionTime(duration: Duration): SolrQueryBuilder = duration match {
+        case fd: FiniteDuration ⇒ allowedExecutionTime(fd)
+        case _ ⇒ withoutAllowedExecutionTime()
+    }
+
+    def withoutAllowedExecutionTime() = copy(serverTimeAllowed = None)
+
+    /*** solrquery creation ***/
+
+    /**
+     * Create a [[SolrParams]] object that can be used for Solr queries
+     * @return an [[ImmutableSolrParams]] representing the state of the builder
+     */
+    def toParams: ImmutableSolrParams = {
+        val solrQuery = new SolrQuery(query)
+
+        rowsOpt foreach (r ⇒ solrQuery setRows r)
+        startOpt foreach (s ⇒ solrQuery setStart s)
+        solrQuery setFields (fieldList.toSeq: _*)
+        sortsList foreach (s ⇒ solrQuery addSort s)
+        if (facetFields.nonEmpty)
+            solrQuery addFacetField (facetFields.toSeq: _*)
+        serverTimeAllowed foreach (ms ⇒ solrQuery setTimeAllowed ms)
+
+        ImmutableSolrParams(solrQuery)
+    }
+}
+
+object SolrQueryBuilder {
+    implicit class FieldStrToSort(val f: String) extends AnyVal {
+        def ascending = new SortClause(f, SolrQuery.ORDER.asc)
+        def asc = ascending
+        def descending = new SortClause(f, SolrQuery.ORDER.desc)
+        def desc = descending
+    }
+
+    /*
+     * Didn't use Solr's immutable MultiMapSolrParams because it'd be a lot of converting collections back and forth,
+     * and it's missing a SerialVersionUID (at least in 4.5)
+     */
+    /**
+     * An immutable implementation of [[SolrParams]]; like [[org.apache.solr.common.params.MultiMapSolrParams]] but
+     * Scala-ish
+     */
+    @SerialVersionUID(1L)
+    case class ImmutableSolrParams(params: HashMap[String, Vector[String]]) extends SolrParams {
+        override def get(param: String): String = {
+            (params get param flatMap {
+                case null ⇒ None
+                case vec if vec.size > 0 ⇒ Some(vec(0))
+                case _ ⇒ None
+            }).orNull
+        }
+
+        override def getParameterNamesIterator: ju.Iterator[String] = params.keys.iterator.asJava
+
+        override def getParams(param: String): Array[String] = (params get param map (_.toArray)).orNull
+    }
+
+    object ImmutableSolrParams {
+        def apply(params: SolrParams): ImmutableSolrParams = new ImmutableSolrParams(
+            (HashMap.empty[String, Vector[String]] /: params.getParameterNamesIterator.asScala) {
+                case (acc, param) ⇒ acc + (param → params.getParams(param).toVector)
+            })
+    }
+}

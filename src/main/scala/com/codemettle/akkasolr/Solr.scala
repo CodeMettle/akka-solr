@@ -11,6 +11,8 @@ import org.apache.solr.common.params.SolrParams
 
 import com.codemettle.akkasolr.client.SolrQueryBuilder
 import com.codemettle.akkasolr.ext.SolrExtImpl
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
 
 import akka.actor._
 import scala.concurrent.duration._
@@ -36,7 +38,30 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
      */
     def createQuery(q: String) = SolrQueryBuilder(q)
 
-    /***** messages *****/
+    def createQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = SolrQueryBuilder(SolrQueryStringBuilder render qp)
+
+    /**
+     * Create an empty Solr Query String builder
+     *
+     * {{{
+     *     val query = Solr createQuery (Solr.queryBuilder
+     *       AND (
+     *        field("f1") := 3,
+     *        field("f2") :!= "x",
+     *        OR (
+     *          defaultField() isAnyOf (1, 2),
+     *          NOT (field("f3") := 4),
+     *          field("time") isInRange (3, 5)
+     *        )
+     *     )
+     *    )
+     * }}}
+     *
+     * @return an empty query string builder
+     */
+    def queryBuilder = SolrQueryStringBuilder.Empty
+
+    /* **** messages *****/
 
     @SerialVersionUID(1L)
     case class SolrConnection(forAddress: String, connection: ActorRef)

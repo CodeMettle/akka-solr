@@ -14,7 +14,10 @@ import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.common.params.SolrParams
 
 import com.codemettle.akkasolr.client.SolrQueryBuilder.ImmutableSolrParams
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
 
+import akka.actor.ActorRefFactory
 import scala.collection.JavaConverters._
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -40,9 +43,11 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None) {
-    /*** builder shortcuts ***/
+    /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = q)
+
+    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = SolrQueryStringBuilder render qp)
 
     def rows(r: Int) = copy(rowsOpt = Some(r))
 

@@ -1,7 +1,7 @@
 /*
  * SolrExtImpl.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Sep 22, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -24,7 +24,9 @@ object SolrExtImpl {
 class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     private val manager = eas.actorOf(Manager.props, "Solr")
 
-    val responseParserDispatcher = eas.dispatchers lookup "akka.solr.response-parser-dispatcher"
+    val responseParserDispatcher = eas.dispatchers lookup "akkasolr.response-parser-dispatcher"
+
+    val maxBooleanClauses = eas.settings.config.getInt("akkasolr.solrMaxBooleanClauses")
 
     def clientTo(solrUrl: String)(implicit requestor: ActorRef) = {
         val uri = Util normalize solrUrl

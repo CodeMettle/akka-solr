@@ -1,5 +1,5 @@
 
-organization := "com.github.akka-solr"
+organization := "com.codemettle.akka-solr"
 
 name := "akka-solr"
 

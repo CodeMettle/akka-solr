@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
-package com.codemettle.akkasolr.client
+package com.codemettle.akkasolr.querybuilder
 
 import java.{util => ju}
 
@@ -13,8 +13,7 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.common.params.SolrParams
 
-import com.codemettle.akkasolr.client.SolrQueryBuilder.ImmutableSolrParams
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder
+import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
 
 import akka.actor.ActorRefFactory

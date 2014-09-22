@@ -12,7 +12,8 @@ import org.apache.solr.common.params.SolrParams
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
-import com.codemettle.akkasolr.client.SolrQueryBuilder.{FieldStrToSort, ImmutableSolrParams}
+import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder
+import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.{FieldStrToSort, ImmutableSolrParams}
 
 import scala.concurrent.duration.Duration
 

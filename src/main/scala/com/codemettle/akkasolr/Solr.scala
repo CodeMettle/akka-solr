@@ -9,10 +9,9 @@ package com.codemettle.akkasolr
 
 import org.apache.solr.common.params.SolrParams
 
-import com.codemettle.akkasolr.client.SolrQueryBuilder
 import com.codemettle.akkasolr.ext.SolrExtImpl
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
+import com.codemettle.akkasolr.querybuilder.{SolrQueryBuilder, SolrQueryStringBuilder}
 
 import akka.actor._
 import scala.concurrent.duration._

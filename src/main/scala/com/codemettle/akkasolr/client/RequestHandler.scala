@@ -8,6 +8,8 @@
 package com.codemettle.akkasolr
 package client
 
+import java.io.InputStream
+
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.response.QueryResponse
@@ -17,7 +19,7 @@ import org.apache.solr.common.util.NamedList
 import spray.can.Http
 import spray.http._
 
-import com.codemettle.akkasolr.Solr.SolrOperation
+import com.codemettle.akkasolr.Solr.{AkkaSolrError, SolrOperation}
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
 import com.codemettle.akkasolr.util.Util.RichSolrParams
 import com.codemettle.akkasolr.util.{Util, ActorInputStream}
@@ -95,10 +97,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
             val query = (CommonParams.VERSION → p.getVersion) +: ((CommonParams.WT → p.getWriterType) +: params.toQuery)
 
-            //HttpRequest(HttpMethods.GET, baseUri.selectUri withQuery query)
-            HttpRequest(HttpMethods.POST, baseUri.selectUri,
-                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
-                    query.toString()))
+            HttpRequest(HttpMethods.GET, baseUri.selectUri withQuery query)
+//            HttpRequest(HttpMethods.POST, baseUri.selectUri,
+//                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
+//                    query.toString()))
     }
 
     private def getContentType(implicit resp: HttpResponse) = {
@@ -119,37 +121,46 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         })
     }
 
+    private def processResponse(chunkStart: Boolean)(implicit resp: HttpResponse): Unit = {
+        def doCreateResponseParser(is: InputStream) = createResponseParser match {
+            case Left(err) ⇒ sendError(Solr.InvalidResponse(err))
+
+            case Right((parser, charset)) ⇒
+                implicit val dispatcher = Solr.Client.responseParserDispatcher
+
+                Future(parser.processResponse(is, charset.value)) map Parsed pipeTo self
+        }
+
+        resp.status match {
+            case StatusCodes.RequestEntityTooLarge ⇒
+                sendError(Solr.ServerError(resp.status, "Try sending large queries as POST instead of GET"))
+
+            case _ ⇒ // we can add more special cases as they arise
+                {
+                    if (chunkStart) {
+                        inputStream = new ActorInputStream
+                        Right(inputStream)
+                    } else resp.entity.data match {
+                        case HttpData.Bytes(bytes) ⇒ Right(bytes.iterator.asInputStream)
+                        case _ ⇒ Left(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
+                    }
+                } match {
+                    case Left(err) ⇒ sendError(err)
+                    case Right(is) ⇒ doCreateResponseParser(is)
+                }
+        }
+    }
+
     def receive = {
         case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.timeout))
 
-        /* // tested with binary response and it is smaller but for whatever reason the server doesn't chunk it; prolly should stick with XML... */
         case resp: HttpResponse ⇒
             log.debug("got non-chunked response: {}", resp)
-            resp.entity.data match {
-                case HttpData.Bytes(bytes) ⇒ createResponseParser(resp) match {
-                    case Left(err) ⇒ sendError(Solr.InvalidResponse(err))
-
-                    case Right((parser, charset)) ⇒
-                        implicit val dispatcher = Solr.Client.responseParserDispatcher
-
-                        Future(parser.processResponse(bytes.iterator.asInputStream, charset.value)) map Parsed pipeTo self
-                }
-
-                case _ ⇒ sendError(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
-            }
-        /**/
+            processResponse(chunkStart = false)(resp)
 
         case ChunkedResponseStart(resp) ⇒
             log.debug("response started: {}", resp)
-            inputStream = new ActorInputStream
-            createResponseParser(resp) match {
-                case Left(err) ⇒ sendError(Solr.InvalidResponse(err))
-
-                case Right((parser, charset)) ⇒
-                    implicit val dispatcher = Solr.Client.responseParserDispatcher
-
-                    Future(parser.processResponse(inputStream, charset.value)) map Parsed pipeTo self
-            }
+            processResponse(chunkStart = true)(resp)
 
         case MessageChunk(data, _) ⇒ data match {
             case HttpData.Bytes(bytes) ⇒ inputStream enqueueBytes bytes

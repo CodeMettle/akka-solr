@@ -8,6 +8,7 @@
 package com.codemettle.akkasolr
 
 import org.apache.solr.common.params.SolrParams
+import spray.http.StatusCode
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
@@ -102,4 +103,6 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     case class ParseError(t: Throwable)
         extends Exception(s"Error parsing response: ${t.getMessage}") with NoStackTrace with AkkaSolrError
 
+    @SerialVersionUID(1L)
+    case class ServerError(status: StatusCode, msg: String) extends Exception(s"$status - $msg") with NoStackTrace with AkkaSolrError
 }

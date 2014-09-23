@@ -23,7 +23,6 @@ object SolrQueryStringBuilder {
     case class FieldBuilder(field: Option[String]) {
         def :=(v: FieldValueType) = FieldValue(field, v)
         def :!=(v: FieldValueType) = Not(FieldValue(field, v))
-        def isAnyOf(vs: Iterable[FieldValueType]): QueryPart = isAnyOf(vs.toSeq: _*)
         def isAnyOf(vs: FieldValueType*) = IsAnyOf(field, vs)
         def isInRange(lower: FieldValueType, upper: FieldValueType) = Range(field, lower, upper)
         def exists() = isInRange("*", "*")

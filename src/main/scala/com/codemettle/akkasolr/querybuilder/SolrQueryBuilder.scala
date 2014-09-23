@@ -56,19 +56,13 @@ case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt
 
     def withoutStart() = copy(startOpt = None)
 
-    def fields(fs: Iterable[String]) = copy(fieldList = fs.toVector)
-
     def fields(fs: String*) = copy(fieldList = fs.toVector)
 
     def withField(f: String) = if (fieldList.contains(f)) this else copy(fieldList = fieldList :+ f)
 
-    def withFields(fs: Iterable[String]): SolrQueryBuilder = withFields(fs.toSeq: _*)
-
     def withFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withField f }
 
     def withoutField(f: String) = if (fieldList.contains(f)) copy(fieldList = fieldList filterNot (_ == f)) else this
-
-    def withoutFields(fs: Iterable[String]): SolrQueryBuilder = withoutFields(fs.toSeq: _*)
 
     def withoutFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutField f}
 
@@ -76,16 +70,12 @@ case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt
 
     def sortBy(sc: SortClause) = copy(sortsList = Vector(sc))
 
-    def sortBy(scs: Iterable[SortClause]) = copy(sortsList = scs.toVector)
-
     def sortBy(scs: SortClause*) = copy(sortsList = scs.toVector)
 
     def withSort(sc: SortClause) = sortsList indexWhere (_.getItem == sc.getItem) match {
         case idx if idx < 0 ⇒ copy(sortsList = sortsList :+ sc)
         case idx ⇒ copy(sortsList = sortsList updated (idx, sc))
     }
-
-    def withSorts(scs: Iterable[SortClause]): SolrQueryBuilder = withSorts(scs.toSeq: _*)
 
     def withSorts(scs: SortClause*) = (this /: scs) { case (sqc, sc) ⇒ sqc withSort sc }
 
@@ -95,19 +85,13 @@ case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt
 
     def withoutSorts() = if (sortsList.isEmpty) this else copy(sortsList = Vector.empty)
 
-    def facets(fs: Iterable[String]): SolrQueryBuilder = facets(fs.toSeq: _*)
-
     def facets(fs: String*) = copy(facetFields = fs.toVector)
 
     def withFacetField(f: String) = if (facetFields.contains(f)) this else copy(facetFields = facetFields :+ f)
 
-    def withFacetFields(fs: Iterable[String]): SolrQueryBuilder = withFacetFields(fs.toSeq: _*)
-
     def withFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withFacetField f }
 
     def withoutFacetField(f: String) = if (facetFields.contains(f)) copy(facetFields = facetFields filterNot (_ == f)) else this
-
-    def withoutFacetFields(fs: Iterable[String]): SolrQueryBuilder = withoutFacetFields(fs.toSeq: _*)
 
     def withoutFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutFacetField f }
 

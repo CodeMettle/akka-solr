@@ -124,7 +124,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         p7.render should equal ("((1 OR 2) OR (f:2 AND -g:[* TO *]))")
 
-        val q = Solr createQuery (Solr.queryBuilder
+        val q = Solr createQuery (Solr.queryStringBuilder
             AND(
                 field("f1") := 3,
                 field("f2") :!= "x",

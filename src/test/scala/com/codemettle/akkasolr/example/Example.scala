@@ -49,7 +49,7 @@ object Example extends App {
         }
 
         private def sendQuery() = {
-            val query = Solr createQuery (Solr.queryBuilder rawQuery config.as[String]("testQuery")) rows 10000
+            val query = Solr createQuery (Solr.queryStringBuilder rawQuery config.as[String]("testQuery")) rows 10000
             conn ! Solr.Select(query.toParams)
         }
 

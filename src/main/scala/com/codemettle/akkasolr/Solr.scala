@@ -59,7 +59,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
      *
      * @return an empty query string builder
      */
-    def queryBuilder = SolrQueryStringBuilder.Empty
+    def queryStringBuilder = SolrQueryStringBuilder.Empty
 
     /* **** messages *****/
 

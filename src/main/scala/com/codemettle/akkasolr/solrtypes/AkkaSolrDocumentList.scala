@@ -17,9 +17,12 @@ import scala.collection.JavaConverters._
  */
 @SerialVersionUID(1L)
 case class AkkaSolrDocumentList(original: SolrDocumentList) {
-    def numFound = original.getNumFound
-    def start = original.getStart
-    def maxScore = Option(original.getMaxScore) map (_.floatValue())
+    @transient
+    val resultInfo = SolrResultInfo(original.getNumFound, original.getStart, original.getMaxScore)
+
+    def numFound = resultInfo.numFound
+    def start = resultInfo.start
+    def maxScore = resultInfo.maxScore
 
     def documents = original.asScala map AkkaSolrDocument.apply
 }

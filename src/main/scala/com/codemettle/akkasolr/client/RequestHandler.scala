@@ -9,18 +9,19 @@ package com.codemettle.akkasolr
 package client
 
 import java.io.InputStream
+import java.{lang => jl}
 
-import org.apache.solr.client.solrj.ResponseParser
-import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.common.params.CommonParams
+import org.apache.solr.client.solrj.impl.{BinaryResponseParser, StreamingBinaryResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
+import org.apache.solr.common.SolrDocument
+import org.apache.solr.common.params.{CommonParams, UpdateParams}
 import org.apache.solr.common.util.NamedList
 import spray.can.Http
 import spray.http._
 
-import com.codemettle.akkasolr.Solr.SolrOperation
+import com.codemettle.akkasolr.Solr.{RequestMethods, SolrOperation, SolrResponseTypes}
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
-import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
+import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, SolrResultInfo}
 import com.codemettle.akkasolr.util.ActorInputStream
 
 import akka.actor._
@@ -45,6 +46,15 @@ object RequestHandler {
 
 class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)
     extends Actor with ActorLogging {
+    class StreamCallback extends StreamingResponseCallback {
+        override def streamSolrDocument(doc: SolrDocument): Unit = {
+            replyTo ! AkkaSolrDocument(doc)
+        }
+
+        override def streamDocListInfo(numFound: Long, start: Long, maxScore: jl.Float): Unit = {
+            replyTo ! SolrResultInfo(numFound, start, maxScore)
+        }
+    }
 
     private val timer = {
         import context.dispatcher
@@ -56,7 +66,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     override def preStart() = {
         super.preStart()
 
-        host ! createHttpRequest
+        checkCreateHttpRequest match {
+            case Left(err) ⇒ sendError(Solr.InvalidRequest(err))
+            case Right(req) ⇒ host ! req
+        }
     }
 
     override def postStop() = {
@@ -70,39 +83,67 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         context stop self
     }
 
-    private def createHttpRequest = request match {
-        case Solr.Ping(action, _) ⇒
-            val p = new /*Binary*/XMLResponseParser
+    private def createHttpRequest = {
+        val parser = request.options.responseType match {
+            case SolrResponseTypes.Binary ⇒ new BinaryResponseParser
+            case SolrResponseTypes.XML ⇒ new XMLResponseParser
+            case SolrResponseTypes.Streaming ⇒ new StreamingBinaryResponseParser(null)
+        }
 
-            val baseQuery = Uri.Query(
-                CommonParams.VERSION → p.getVersion,
-                CommonParams.WT      → p.getWriterType
-            )
+        val baseQuery = Uri.Query(
+            CommonParams.VERSION → parser.getVersion,
+            CommonParams.WT → parser.getWriterType
+        )
 
-            val query = action.fold(baseQuery) {
-                case Solr.Ping.Enable  ⇒ (CommonParams.ACTION → CommonParams.ENABLE)  +: baseQuery
-                case Solr.Ping.Disable ⇒ (CommonParams.ACTION → CommonParams.DISABLE) +: baseQuery
-            }
+        val (uri, addlQuery) = request match {
+            case Solr.Ping(action, _) ⇒
+                baseUri.pingUri → action.fold(Uri.Query.Empty: Uri.Query) {
+                    case Solr.Ping.Enable ⇒ Uri.Query(CommonParams.ACTION → CommonParams.ENABLE)
+                    case Solr.Ping.Disable ⇒ Uri.Query(CommonParams.ACTION → CommonParams.DISABLE)
+                }
 
-            //HttpRequest(HttpMethods.GET, baseUri.pingUri withQuery query)
-            HttpRequest(HttpMethods.POST, baseUri.pingUri,
-                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
+            case Solr.Select(params, _) ⇒ baseUri.selectUri → params.toQuery
+
+            case Solr.Commit(waitSearch, soft, _) ⇒
+                baseUri.updateUri → Uri.Query(
+                    UpdateParams.COMMIT → "true",
+                    UpdateParams.SOFT_COMMIT → soft.toString,
+                    UpdateParams.WAIT_SEARCHER → waitSearch.toString
+                )
+
+            case Solr.Optimize(waitSearch, maxSegs, _) ⇒
+                baseUri.updateUri → Uri.Query(
+                    UpdateParams.OPTIMIZE → "true",
+                    UpdateParams.MAX_OPTIMIZE_SEGMENTS → maxSegs.toString,
+                    UpdateParams.WAIT_SEARCHER → waitSearch.toString
+                )
+
+            case Solr.Rollback(_) ⇒
+                baseUri.updateUri → Uri.Query(UpdateParams.ROLLBACK → "true")
+        }
+
+        val query = (addlQuery :\ baseQuery) {
+            case ((k, v), acc) ⇒ (k → v) +: acc
+        }
+
+        request.options.method match {
+            case RequestMethods.GET ⇒
+                HttpRequest(HttpMethods.GET, uri withQuery query)
+
+            case RequestMethods.POST ⇒
+                HttpRequest(HttpMethods.POST, uri, entity = HttpEntity(
+                    ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
                     query.toString()))
+        }
+    }
 
-        case Solr.Select(params, _) ⇒
-            val p = new /*XML*/BinaryResponseParser
-
-            val baseQuery = Uri.Query(
-                CommonParams.VERSION → p.getVersion,
-                CommonParams.WT → p.getWriterType
-            )
-
-            val query = (CommonParams.VERSION → p.getVersion) +: ((CommonParams.WT → p.getWriterType) +: params.toQuery)
-
-            HttpRequest(HttpMethods.GET, baseUri.selectUri withQuery query)
-//            HttpRequest(HttpMethods.POST, baseUri.selectUri,
-//                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
-//                    query.toString()))
+    private def checkCreateHttpRequest = {
+        if (request.options.responseType == SolrResponseTypes.Streaming) {
+            request match {
+                case Solr.Select(_, _) ⇒ Right(createHttpRequest)
+                case _ ⇒ Left("Streaming responses can only be requested for Select operations")
+            }
+        } else Right(createHttpRequest)
     }
 
     private def getContentType(implicit resp: HttpResponse) = {
@@ -115,6 +156,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         getContentType.fold[RespParserRetval](Left("No Content-Type header found")) (ct ⇒ {
             ct.mediaType match {
                 case MediaTypes.`application/xml` ⇒ Right(new XMLResponseParser → ct.charset)
+
+                case MediaTypes.`application/octet-stream` if request.options.responseType ==
+                    SolrResponseTypes.Streaming ⇒
+                    Right(new StreamingBinaryResponseParser(new StreamCallback) → ct.charset)
 
                 case MediaTypes.`application/octet-stream` ⇒ Right(new BinaryResponseParser → ct.charset)
 

@@ -1,7 +1,7 @@
 /*
  * Solr.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Sep 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -29,7 +29,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
     override def lookup() = Solr
 
-    /***** utils *****/
+    /* **** utils *****/
 
     /**
      * Create a [[com.codemettle.akkasolr.querybuilder.SolrQueryBuilder]]
@@ -99,6 +99,17 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
                     options: RequestOptions = RequestOptions(method = RequestMethods.GET, requestTimeout = 5.seconds))
         extends SolrOperation
 
+    @SerialVersionUID(1L)
+    case class Commit(waitForSearcher: Boolean = true, softCommit: Boolean = false,
+                      options: RequestOptions = RequestOptions()) extends SolrOperation
+
+    @SerialVersionUID(1L)
+    case class Optimize(waitForSearcher: Boolean = true, maxSegments: Int = 1,
+                        options: RequestOptions = RequestOptions()) extends SolrOperation
+
+    @SerialVersionUID(1L)
+    case class Rollback(options: RequestOptions = RequestOptions()) extends SolrOperation
+
     /* **** errors *****/
 
     sealed trait AkkaSolrError
@@ -109,6 +120,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class RequestTimedOut(after: FiniteDuration)
         extends Exception(s"Request timed out after $after") with NoStackTrace with AkkaSolrError
+
+    @SerialVersionUID(1L)
+    case class InvalidRequest(msg: String) extends Exception(msg) with NoStackTrace with AkkaSolrError
 
     @SerialVersionUID(1L)
     case class InvalidResponse(msg: String)

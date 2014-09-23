@@ -1,7 +1,7 @@
 /*
  * ClientConnection.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Sep 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -15,6 +15,7 @@ import spray.http._
 
 import com.codemettle.akkasolr.Solr.SolrOperation
 import com.codemettle.akkasolr.client.ClientConnection.fsm
+import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
@@ -138,25 +139,13 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
             goto(fsm.Disconnected) using fsm.CCData()
 
-        case Event(qr: QueryResponse, _) ⇒
-            log.debug("replace this later; connected; {}", qr)
+        case Event(qr: SolrQueryResponse, _) ⇒
+            log.debug("got response to ping {}, check status etc?", qr)
             goto(fsm.Connected)
 
-        case Event(HttpResponse(StatusCodes.OK, _, _, _), data) ⇒ goto(fsm.Connected)
-
-        case Event(HttpResponse(StatusCodes.NotFound, _, _, _), data) ⇒
-            /*
-            val exc = new Http.ConnectionException(s"$pingUri not found; is '${baseUri.path}' the correct address?")
-
-            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
-            */
-
-            goto(fsm.Disconnected) using fsm.CCData()
-
-        case Event(resp: HttpResponse, data) ⇒
-            log.error("{}", resp)
-            val exc = new Http.ConnectionException("fill this in!@!")
-            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
+        case Event(Status.Failure(t), data) ⇒
+            log.error(t, "Couldn't ping server")
+            stasher ! ConnectingStasher.ErrorOutAllWaiting(t)
             goto(fsm.Disconnected) using fsm.CCData()
     })
 

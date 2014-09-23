@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Sep 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -20,6 +20,7 @@ import spray.http._
 
 import com.codemettle.akkasolr.Solr.SolrOperation
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
+import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
 import com.codemettle.akkasolr.util.ActorInputStream
 
 import akka.actor._
@@ -136,6 +137,9 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
             case StatusCodes.RequestEntityTooLarge ⇒
                 sendError(Solr.ServerError(resp.status, "Try sending large queries as POST instead of GET"))
 
+            case StatusCodes.NotFound ⇒
+                sendError(Solr.ServerError(resp.status, s"Is '${baseUri.path}' the correct address to Solr?"))
+
             case _ ⇒ // we can add more special cases as they arise
                 {
                     if (chunkStart) {
@@ -177,7 +181,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         case Status.Failure(t) ⇒ sendError(Solr.ParseError(t))
 
         case Parsed(result) ⇒
-            replyTo ! new QueryResponse(result, null)
+            replyTo ! SolrQueryResponse(result)
             context stop self
 
         case m ⇒

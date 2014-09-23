@@ -31,9 +31,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     /***** utils *****/
 
     /**
-     * Create a [[SolrQueryBuilder]]
+     * Create a [[com.codemettle.akkasolr.querybuilder.SolrQueryBuilder]]
      * @param q Solr query string
-     * @return a [[SolrQueryBuilder]]
+     * @return a [[com.codemettle.akkasolr.querybuilder.SolrQueryBuilder]]
      */
     def createQuery(q: String) = SolrQueryBuilder(q)
 

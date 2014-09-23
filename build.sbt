@@ -29,3 +29,23 @@ libraryDependencies += {
         case Some((2, 11)) => Deps.ficus2_11
     }
 } % "test"
+
+autoAPIMappings := true
+
+apiMappings ++= {
+    val cp: Seq[Attributed[File]] = (fullClasspath in Compile).value
+    def findManagedDependency(organization: String, name: String): File = {
+        ( for {
+            entry <- cp
+            module <- entry.get(moduleID.key)
+            if module.organization == organization
+            if module.name.startsWith(name)
+            jarFile = entry.data
+        } yield jarFile
+            ).head
+    }
+    Map(
+        findManagedDependency("org.scala-lang", "scala-library") -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"),
+        findManagedDependency("com.typesafe.akka", "akka-actor") -> url(s"http://doc.akka.io/api/akka/${Versions.akka}/")
+    )
+}

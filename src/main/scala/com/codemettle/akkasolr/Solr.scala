@@ -85,13 +85,21 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         case object Disable extends Action
     }
 
+    sealed trait AkkaSolrError
+
+    @SerialVersionUID(1L)
+    case class InvalidUrl(url: String, error: String) extends Exception(error) with NoStackTrace with AkkaSolrError
+
     @SerialVersionUID(1L)
     case class RequestTimedOut(after: FiniteDuration)
-        extends Exception(s"Request timed out after $after") with NoStackTrace
+        extends Exception(s"Request timed out after $after") with NoStackTrace with AkkaSolrError
 
     @SerialVersionUID(1L)
-    case class InvalidResponse(msg: String) extends Exception(s"Couldn't handle response: $msg") with NoStackTrace
+    case class InvalidResponse(msg: String)
+        extends Exception(s"Couldn't handle response: $msg") with NoStackTrace with AkkaSolrError
 
     @SerialVersionUID(1L)
-    case class ParseError(t: Throwable) extends Exception(s"Error parsing response: ${t.getMessage}") with NoStackTrace
+    case class ParseError(t: Throwable)
+        extends Exception(s"Error parsing response: ${t.getMessage}") with NoStackTrace with AkkaSolrError
+
 }

@@ -7,7 +7,7 @@
  */
 package com.codemettle
 
-import org.apache.solr.common.params.CommonParams
+import org.apache.solr.common.params.{SolrParams, CommonParams}
 import spray.http.Uri
 
 import akka.actor.ActorRefFactory
@@ -26,6 +26,24 @@ package object akkasolr {
         def selectUri = baseUri withPath baseUri.path / "select"
         def updateUri = baseUri withPath baseUri.path / "update"
         def pingUri = baseUri withPath baseUri.path ++ Uri.Path(CommonParams.PING_HANDLER)
+    }
+
+    implicit class RichSolrParams(val sp: SolrParams) extends AnyVal {
+        def toQuery = {
+            // Duplicate behavior of org.apache.solr.client.solrj.util.ClientUtils.toQueryString
+            def paramToKVs(paramName: String): Seq[(String, String)] = sp getParams paramName match {
+                case null ⇒ Seq(paramName → Uri.Query.EmptyValue)
+                case arr if arr.length == 0 ⇒ Nil
+                case values ⇒ values map {
+                    case null ⇒ paramName → Uri.Query.EmptyValue
+                    case v ⇒ paramName → v
+                }
+            }
+
+            import scala.collection.JavaConverters._
+
+            Uri.Query((sp.getParameterNamesIterator.asScala flatMap paramToKVs).toSeq: _*)
+        }
     }
 
     def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem

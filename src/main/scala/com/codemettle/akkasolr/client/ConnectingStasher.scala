@@ -47,7 +47,8 @@ class ConnectingStasher extends Actor {
             stashed += (wr → t)
 
         case TimedOut(wr @ WaitingRequest(replyTo, req, _, _)) ⇒
-            replyTo ! Status.Failure(new Http.ConnectionException(s"Connection not established within ${req.timeout}"))
+            replyTo ! Status.Failure(
+                new Http.ConnectionException(s"Connection not established within ${req.options.requestTimeout}"))
             stashed -= wr
 
         case ErrorOutAllWaiting(t) ⇒

@@ -13,16 +13,14 @@ import java.io.InputStream
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.util.ClientUtils
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.util.NamedList
 import spray.can.Http
 import spray.http._
 
-import com.codemettle.akkasolr.Solr.{AkkaSolrError, SolrOperation}
+import com.codemettle.akkasolr.Solr.SolrOperation
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
-import com.codemettle.akkasolr.util.Util.RichSolrParams
-import com.codemettle.akkasolr.util.{Util, ActorInputStream}
+import com.codemettle.akkasolr.util.ActorInputStream
 
 import akka.actor._
 import akka.pattern._
@@ -85,7 +83,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
                 case Solr.Ping.Disable ⇒ (CommonParams.ACTION → CommonParams.DISABLE) +: baseQuery
             }
 
-            HttpRequest(HttpMethods.GET, baseUri.pingUri withQuery query)
+            //HttpRequest(HttpMethods.GET, baseUri.pingUri withQuery query)
+            HttpRequest(HttpMethods.POST, baseUri.pingUri,
+                entity = HttpEntity(ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
+                    query.toString()))
 
         case Solr.Select(params, _) ⇒
             val p = new /*XML*/BinaryResponseParser
@@ -152,7 +153,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     }
 
     def receive = {
-        case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.timeout))
+        case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.options.requestTimeout))
 
         case resp: HttpResponse ⇒
             log.debug("got non-chunked response: {}", resp)

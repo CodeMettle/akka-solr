@@ -67,24 +67,39 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     case class SolrConnection(forAddress: String, connection: ActorRef)
 
     sealed trait SolrOperation {
-        def timeout: FiniteDuration
+        def options: RequestOptions
     }
 
     @SerialVersionUID(1L)
-    case class Select(query: SolrParams, timeout: FiniteDuration = 1.minute) extends SolrOperation
+    case class Select(query: SolrParams, options: RequestOptions) extends SolrOperation {
+        def withOptions(opts: RequestOptions) = copy(options = opts)
 
-    @SerialVersionUID(1L)
-    case class Ping(action: Option[Ping.Action] = None, timeout: FiniteDuration = 5.seconds) extends SolrOperation
+        def withTimeout(d: FiniteDuration) = copy(options = options.copy(requestTimeout = d))
 
-    @SerialVersionUID(1L)
-    object Ping {
-        @SerialVersionUID(1L)
-        sealed trait Action
-        @SerialVersionUID(1L)
-        case object Enable extends Action
-        @SerialVersionUID(1L)
-        case object Disable extends Action
+        def withRequestMethod(rm: RequestMethod) = copy(options = options.copy(method = rm))
+
+        def withResponseType(srt: SolrResponseType) = copy(options = options.copy(responseType = srt))
+
+        def streaming = copy(options = options.copy(responseType = SolrResponseTypes.Streaming))
     }
+
+    object Select {
+        def apply(query: SolrParams): Select = new Select(query, RequestOptions())
+        def apply(qBuilder: SolrQueryBuilder): Select = new Select(qBuilder.toParams, RequestOptions())
+        def Streaming(query: SolrParams): Select = {
+            new Select(query, RequestOptions(responseType = SolrResponseTypes.Streaming))
+        }
+        def Streaming(qBuilder: SolrQueryBuilder): Select = {
+            new Select(qBuilder.toParams, RequestOptions(responseType = SolrResponseTypes.Streaming))
+        }
+    }
+
+    @SerialVersionUID(1L)
+    case class Ping(action: Option[Ping.Action] = None,
+                    options: RequestOptions = RequestOptions(method = RequestMethods.GET, requestTimeout = 5.seconds))
+        extends SolrOperation
+
+    /* **** errors *****/
 
     sealed trait AkkaSolrError
 
@@ -104,5 +119,46 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         extends Exception(s"Error parsing response: ${t.getMessage}") with NoStackTrace with AkkaSolrError
 
     @SerialVersionUID(1L)
-    case class ServerError(status: StatusCode, msg: String) extends Exception(s"$status - $msg") with NoStackTrace with AkkaSolrError
+    case class ServerError(status: StatusCode, msg: String)
+        extends Exception(s"$status - $msg") with NoStackTrace with AkkaSolrError
+
+    /* **** types *****/
+
+    @SerialVersionUID(1L)
+    object Ping {
+        @SerialVersionUID(1L)
+        sealed trait Action
+        @SerialVersionUID(1L)
+        case object Enable extends Action
+        @SerialVersionUID(1L)
+        case object Disable extends Action
+    }
+
+    sealed trait RequestMethod
+
+    @SerialVersionUID(1L)
+    object RequestMethods {
+        @SerialVersionUID(1L)
+        case object GET extends RequestMethod
+        @SerialVersionUID(1L)
+        case object POST extends RequestMethod
+    }
+
+    sealed trait SolrResponseType
+
+    @SerialVersionUID(1L)
+    object SolrResponseTypes {
+        @SerialVersionUID(1L)
+        case object XML extends SolrResponseType
+        @SerialVersionUID(1L)
+        case object Binary extends SolrResponseType
+        @SerialVersionUID(1L)
+        case object Streaming extends SolrResponseType
+    }
+
+    @SerialVersionUID(1L)
+    case class RequestOptions(method: RequestMethod = RequestMethods.POST,
+                              responseType: SolrResponseType = SolrResponseTypes.Binary,
+                              requestTimeout: FiniteDuration = 1.minute)
+
 }

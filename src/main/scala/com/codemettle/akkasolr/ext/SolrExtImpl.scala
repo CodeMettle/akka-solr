@@ -71,9 +71,9 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * `Ask`s the Solr.Client.manager for a connection actor.
      *
      * @see [[SolrExtImpl.clientTo]]
-     * @return a [[Future]] containing the [[Solr.SolrConnection]]
+     * @return a [[Future]] containing the connection's [[com.codemettle.akkasolr.client.ClientConnection]] [[ActorRef]]
      */
-    def clientFutureTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[SolrConnection] = {
+    def clientFutureTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ActorRef] = {
         val uri = Util normalize solrUrl
         uri.scheme match {
             case scheme() ⇒
@@ -81,7 +81,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
                 import akka.pattern.ask
                 implicit val timeout = Timeout(10.seconds)
 
-                (manager ? Manager.Messages.ClientTo(uri, solrUrl)).mapTo[SolrConnection] transform (identity, {
+                (manager ? Manager.Messages.ClientTo(uri, solrUrl)).mapTo[SolrConnection] transform (_.connection, {
                     case _: AskTimeoutException ⇒ new Exception("Unknown error, no response from Solr Manager")
                     case t ⇒ t
                 })

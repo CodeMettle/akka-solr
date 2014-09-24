@@ -18,7 +18,9 @@ import akka.actor.ActorRefFactory
 object SolrQueryStringBuilder {
     type FieldValueType = Any
 
-    sealed trait QueryPart
+    sealed trait QueryPart {
+        def toQuery()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render(this))
+    }
 
     case class FieldBuilder(field: Option[String]) {
         def :=(v: FieldValueType) = FieldValue(field, v)

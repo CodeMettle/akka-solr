@@ -12,6 +12,8 @@ import org.apache.solr.common.util.NamedList
 
 import com.codemettle.akkasolr.Solr
 
+import scala.collection.JavaConverters._
+
 /**
  * @author steven
  *
@@ -23,6 +25,15 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
 
     @transient
     lazy val results = AkkaSolrDocumentList(original.getResults)
+
+    @transient
+    lazy val facetFields = Option(original.getFacetFields) map (ffs ⇒ {
+        (ffs.asScala map (ff ⇒ {
+            ff.getName → {
+                (ff.getValues.asScala map (c ⇒ c.getName → c.getCount)).toMap
+            }
+        })).toMap
+    })
 }
 
 object SolrQueryResponse {

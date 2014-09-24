@@ -16,7 +16,6 @@ import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.params.{CommonParams, UpdateParams}
 import org.apache.solr.common.util.NamedList
-import spray.can.Http
 import spray.http._
 
 import com.codemettle.akkasolr.Solr.{RequestMethods, SolrOperation, SolrResponseTypes}
@@ -175,7 +174,8 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
             case Right((parser, charset)) ⇒
                 implicit val dispatcher = Solr.Client.responseParserDispatcher
 
-                Future(parser.processResponse(is, charset.value)) map Parsed pipeTo self
+                Future(parser.processResponse(is, charset.value)) map Parsed recover
+                    { case t ⇒ Solr.ParseError(t)} pipeTo self
         }
 
         resp.status match {
@@ -221,12 +221,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
         case _: ChunkedMessageEnd ⇒ inputStream.streamFinished()
 
-        case Status.Failure(e: Http.ConnectionException) ⇒ sendError(e)
-
-        case Status.Failure(t) ⇒ sendError(Solr.ParseError(t))
+        case Status.Failure(t) ⇒ sendError(t)
 
         case Parsed(result) ⇒
-            replyTo ! SolrQueryResponse(result)
+            replyTo ! SolrQueryResponse(request, result)
             context stop self
 
         case m ⇒

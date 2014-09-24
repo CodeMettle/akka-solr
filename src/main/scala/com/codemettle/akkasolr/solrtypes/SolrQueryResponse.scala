@@ -10,12 +10,14 @@ package com.codemettle.akkasolr.solrtypes
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.util.NamedList
 
+import com.codemettle.akkasolr.Solr
+
 /**
  * @author steven
  *
  */
 @SerialVersionUID(1L)
-case class SolrQueryResponse(original: QueryResponse) {
+case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResponse) {
     @transient
     lazy val header = SolrQueryResponseHeader(original.getHeader)
 
@@ -24,5 +26,7 @@ case class SolrQueryResponse(original: QueryResponse) {
 }
 
 object SolrQueryResponse {
-    def apply(nl: NamedList[AnyRef]): SolrQueryResponse = SolrQueryResponse(new QueryResponse(nl, null))
+    def apply(req: Solr.SolrOperation, nl: NamedList[AnyRef]): SolrQueryResponse = {
+        SolrQueryResponse(req, new QueryResponse(nl, null))
+    }
 }

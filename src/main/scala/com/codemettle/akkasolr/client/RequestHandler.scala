@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Sep 23, 2014
+ * Updated: Sep 25, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -10,8 +10,9 @@ package client
 
 import java.io.InputStream
 import java.{lang => jl}
-
+import scala.collection.JavaConverters._
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, StreamingBinaryResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.params.{CommonParams, UpdateParams}
@@ -21,7 +22,7 @@ import spray.http._
 import com.codemettle.akkasolr.Solr.{RequestMethods, SolrOperation, SolrResponseTypes}
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
 import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, SolrResultInfo}
-import com.codemettle.akkasolr.util.ActorInputStream
+import com.codemettle.akkasolr.util.{Util, ActorInputStream}
 
 import akka.actor._
 import akka.pattern._
@@ -82,7 +83,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         context stop self
     }
 
-    private def createHttpRequest = {
+    private def createQueryRequest = {
         val parser = request.options.responseType match {
             case SolrResponseTypes.Binary ⇒ new BinaryResponseParser
             case SolrResponseTypes.XML ⇒ new XMLResponseParser
@@ -119,6 +120,8 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
             case Solr.Rollback(_) ⇒
                 baseUri.updateUri → Uri.Query(UpdateParams.ROLLBACK → "true")
+
+            case _: Solr.Update ⇒ sys.error("Shouldn't have made it here")
         }
 
         val query = (addlQuery :\ baseQuery) {
@@ -133,6 +136,33 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
                 HttpRequest(HttpMethods.POST, uri, entity = HttpEntity(
                     ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
                     query.toString()))
+        }
+    }
+
+    private def createHttpRequest = {
+        request match {
+            case Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) ⇒
+                val ur = new UpdateRequest
+                addDocs foreach (ur.add(_, opts.overwrite))
+                if (deleteIds.nonEmpty)
+                    ur.deleteById(deleteIds.asJava)
+                if (deleteQueries.nonEmpty)
+                    ur.setDeleteQuery(deleteQueries.asJava)
+
+                val query = {
+                    if (opts.commit)
+                        Uri.Query(UpdateParams.COMMIT → "true")
+                    else if (opts.commitWithin.isDefined)
+                        Uri.Query(UpdateParams.COMMIT_WITHIN → opts.commitWithin.get.toMillis.toString)
+                    else
+                        Uri.Query.Empty
+                }
+
+                HttpRequest(HttpMethods.POST, baseUri.updateUri withQuery query,
+                    entity = HttpEntity(ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`),
+                        Util updateRequestToByteString ur))
+
+            case _ ⇒ createQueryRequest
         }
     }
 

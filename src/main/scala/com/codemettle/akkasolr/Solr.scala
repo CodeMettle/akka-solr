@@ -1,20 +1,24 @@
 /*
  * Solr.scala
  *
- * Updated: Sep 23, 2014
+ * Updated: Sep 25, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
 package com.codemettle.akkasolr
 
+import org.apache.solr.client.solrj.request.UpdateRequest
+import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.SolrParams
 import spray.http.StatusCode
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
 import com.codemettle.akkasolr.querybuilder.{SolrQueryBuilder, SolrQueryStringBuilder}
+import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
+import akka.util.ByteString
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
@@ -110,6 +114,55 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class Rollback(options: RequestOptions = RequestOptions()) extends SolrOperation
 
+    @SerialVersionUID(1L)
+    case class Update(addDocs: Vector[SolrInputDocument] = Vector.empty, deleteIds: Vector[String] = Vector.empty,
+                      deleteQueries: Vector[String] = Vector.empty, updateOptions: UpdateOptions = UpdateOptions(),
+                      options: RequestOptions = RequestOptions()) extends SolrOperation {
+        def addDoc(doc: Map[String, AnyRef]) = copy(addDocs = addDocs ++ Util.createSolrInputDocs(doc))
+
+        def addDoc(doc: SolrInputDocument) = copy(addDocs = addDocs :+ doc)
+
+        def deleteById(id: String) = copy(deleteIds = deleteIds :+ id)
+
+        def deleteByQuery(q: String) = copy(deleteQueries = deleteQueries :+ q)
+
+        def deleteByQuery(qb: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory) = {
+            copy(deleteQueries = deleteQueries :+ (SolrQueryStringBuilder render qb))
+        }
+
+        def commit(c: Boolean) = copy(updateOptions = updateOptions.copy(commit = c))
+
+        def commitWithin(c: Duration) = c match {
+            case fd: FiniteDuration ⇒ copy(updateOptions = updateOptions.copy(commitWithin = Some(fd)))
+            case _ if updateOptions.commitWithin.isEmpty ⇒ this
+            case _ ⇒ copy(updateOptions = updateOptions.copy(commitWithin = None))
+        }
+
+        def overwrite(o: Boolean) = copy(updateOptions = updateOptions.copy(overwrite = o))
+    }
+
+    object Update {
+        def AddSolrDocs(docs: SolrInputDocument*) = {
+            Update(addDocs = docs.toVector)
+        }
+
+        def AddDocs(docs: Map[String, AnyRef]*) = {
+            Update(addDocs = Util.createSolrInputDocs(docs: _*).toVector)
+        }
+
+        def DeleteById(ids: String*) = {
+            Update(deleteIds = ids.toVector)
+        }
+
+        def DeleteByQuery(queries: SolrQueryStringBuilder.QueryPart*)(implicit arf: ActorRefFactory) = {
+            Update(deleteQueries = (queries map SolrQueryStringBuilder.render).toVector)
+        }
+
+        def DeleteByQueryString(queries: String*) = {
+            Update(deleteQueries = queries.toVector)
+        }
+    }
+
     /* **** errors *****/
 
     sealed trait AkkaSolrError
@@ -174,5 +227,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     case class RequestOptions(method: RequestMethod = RequestMethods.POST,
                               responseType: SolrResponseType = SolrResponseTypes.Binary,
                               requestTimeout: FiniteDuration = 1.minute)
+
+    @SerialVersionUID(1L)
+    case class UpdateOptions(commit: Boolean = false, commitWithin: Option[FiniteDuration] = None,
+                             overwrite: Boolean = true)
 
 }

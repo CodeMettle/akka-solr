@@ -9,7 +9,6 @@ The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-S
 #### Note about blocking:
 In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome.
 
---------------
 
 Import
 ------
@@ -42,7 +41,6 @@ Maven:
 </dependency>
 ```
 
--------------
 
 Usage
 -----
@@ -53,7 +51,6 @@ Some scaladocs are provided, open a ticket for anything unclear (or submit a pul
 
 In lieu of detailed documentation, here are a list of examples (using `ask`/`?` syntax for clarity and brevity, even though the library is meant to be used from Actors with message passing).
 
--------------
 
 Plans
 -----
@@ -61,14 +58,12 @@ Plans
 * Add more Scala-friendly request/response wrappers as requested.
 * ???
 
--------------
 
 License
 -------
 
 [Apache License, 2.0](http://www.apache.org/licenses/LICENSE-2.0.html)
 
--------------
 
 Changelog
 ---------

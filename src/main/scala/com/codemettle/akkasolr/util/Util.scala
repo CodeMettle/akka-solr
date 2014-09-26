@@ -1,7 +1,7 @@
 /*
  * Util.scala
  *
- * Updated: Sep 25, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -13,6 +13,8 @@ import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.{SolrInputDocument, SolrInputField}
 import spray.http.{HttpCharsets, Uri}
 
+import com.codemettle.akkasolr.Solr
+
 import akka.util.{ByteString, Helpers}
 import scala.collection.JavaConverters._
 
@@ -21,12 +23,21 @@ import scala.collection.JavaConverters._
  *
  */
 object Util {
-    def normalize(uri: String) = {
-        val u = Uri(uri)
-        if (u.path.reverse.startsWithSlash)
-            u withPath u.path.reverse.tail.reverse
-        else
-            u
+    private val scheme = """^https?$""".r
+
+    def normalize(solrUrl: String) = {
+        val uri = {
+            val u = Uri(solrUrl)
+            if (u.path.reverse.startsWithSlash)
+                u withPath u.path.reverse.tail.reverse
+            else
+                u
+        }
+
+        uri.scheme match {
+            case scheme() ⇒ uri
+            case _ ⇒ throw Solr.InvalidUrl(solrUrl, s"${uri.scheme} connections not supported")
+        }
     }
 
     def actorNamer(prefix: String) = {

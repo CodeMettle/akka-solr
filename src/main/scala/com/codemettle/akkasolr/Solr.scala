@@ -1,16 +1,15 @@
 /*
  * Solr.scala
  *
- * Updated: Sep 25, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
 package com.codemettle.akkasolr
 
-import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.SolrParams
-import spray.http.StatusCode
+import spray.http.{Uri, StatusCode}
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
@@ -18,7 +17,6 @@ import com.codemettle.akkasolr.querybuilder.{SolrQueryBuilder, SolrQueryStringBu
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
-import akka.util.ByteString
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
@@ -66,6 +64,19 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     def queryStringBuilder = SolrQueryStringBuilder.Empty
 
     /* **** messages *****/
+
+    /**
+     * Request that can be sent straight to `Solr.Client.manager`
+     *
+     * @param baseUri Full Uri to the Solr server (ie http://mysolraddress:8983/solr/core1). If no connection to the
+     *                server exists, one will be created.
+     * @param op operation to run
+     */
+    @SerialVersionUID(1L)
+    case class Request(baseUri: String, op: SolrOperation) {
+        @transient
+        val uri = Util normalize baseUri
+    }
 
     @SerialVersionUID(1L)
     case class SolrConnection(forAddress: String, connection: ActorRef)

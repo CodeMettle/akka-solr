@@ -13,8 +13,10 @@ import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.client.ClientConnection
 import com.codemettle.akkasolr.manager.Manager.Messages.ClientTo
 import com.codemettle.akkasolr.manager.Manager.connName
+import com.codemettle.akkasolr.util.Util
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Status, Actor, ActorRef, Props}
+import scala.util.{Success, Failure, Try}
 
 /**
  * @author steven
@@ -35,17 +37,27 @@ object Manager {
 class Manager extends Actor {
     private var connections = Map.empty[Uri, ActorRef]
 
+    private def getConnection(uri: Uri, addr: String) = {
+        connections get uri match {
+            case Some(c) ⇒ c
+            case None ⇒
+                val name = connName.replaceAllIn(uri.toString(), "-")
+                val actor = context.actorOf(Solr.Client.connectionProvider connectionActorProps uri, name)
+                connections += (uri → actor)
+                actor
+        }
+    }
+
     def receive = {
         case ClientTo(uri, addr) ⇒
-            val connection = connections get uri match {
-                case Some(c) ⇒ c
-                case None ⇒
-                    val name = connName.replaceAllIn(uri.toString(), "-")
-                    val actor = context.actorOf(Solr.Client.connectionProvider connectionActorProps uri, name)
-                    connections += (uri → actor)
-                    actor
-            }
+            val connection = getConnection(uri, addr)
 
             sender().tell(Solr.SolrConnection(addr, connection), connection)
+
+        case Solr.Request(addr, op) ⇒
+            Try(Util normalize addr) match {
+                case Failure(t) ⇒ sender() ! Status.Failure(t)
+                case Success(uri) ⇒ getConnection(uri, addr) forward op
+            }
     }
 }

@@ -78,3 +78,4 @@ Changelog
 Credits
 -------
 * Authored by [@codingismy11to7](https://github.com/codingismy11to7) for [@CodeMettle](https://github.com/CodeMettle)
+  * I have used (and contributed to) [@takezoe](https://github.com/takezoe)'s [solr-scala-client](https://github.com/takezoe/solr-scala-client) library extensively. I submitted a patch to make its query builders immutable-ish; akka-solr`s query builders are completely immutable but have some similarities (ie `<query> rows 100 start 0` syntax)

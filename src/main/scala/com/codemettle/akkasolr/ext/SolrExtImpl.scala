@@ -13,10 +13,12 @@ import com.codemettle.akkasolr.ext.SolrExtImpl.scheme
 import com.codemettle.akkasolr.manager.Manager
 import com.codemettle.akkasolr.util.Util
 
+import akka.ConfigurationException
 import akka.actor.{ActorRef, ExtendedActorSystem, Extension}
 import akka.pattern.AskTimeoutException
 import akka.util.Timeout
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 /**
  * @author steven
@@ -27,16 +29,27 @@ object SolrExtImpl {
 }
 
 class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
+    val config = eas.settings.config getConfig "akkasolr"
+
     val manager = eas.actorOf(Manager.props, "Solr")
 
     val responseParserDispatcher = eas.dispatchers lookup "akkasolr.response-parser-dispatcher"
 
-    val maxBooleanClauses = eas.settings.config.getInt("akkasolr.solrMaxBooleanClauses")
+    val maxBooleanClauses = config getInt "solrMaxBooleanClauses"
 
     val maxChunkSize = {
-        val size = eas.settings.config.getBytes("akkasolr.sprayMaxChunkSize")
+        val size = config getBytes "sprayMaxChunkSize"
         if (size > Int.MaxValue || size < 0) sys.error("Invalid maxChunkSize")
         size.toInt
+    }
+
+    val connectionProvider = {
+        val fqcn = config getString "connectionProvider"
+        eas.dynamicAccess.createInstanceFor[ConnectionProvider](fqcn, Nil) match {
+            case Success(cp) ⇒ cp
+            case Failure(e) ⇒
+                throw new ConfigurationException(s"Could not find/load Connection Provider class [$fqcn]", e)
+        }
     }
 
     /**
@@ -83,8 +96,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
         val uri = Util normalize solrUrl
         uri.scheme match {
             case scheme() ⇒
-                import scala.concurrent.duration._
                 import akka.pattern.ask
+                import scala.concurrent.duration._
                 implicit val timeout = Timeout(10.seconds)
 
                 (manager ? Manager.Messages.ClientTo(uri, solrUrl)).mapTo[SolrConnection] transform (_.connection, {

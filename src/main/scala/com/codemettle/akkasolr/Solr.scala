@@ -100,10 +100,15 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
     object Select {
         def apply(query: SolrParams): Select = new Select(query, RequestOptions())
-        def apply(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = apply(qSBuilder.queryOptions())
+        def apply(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = {
+            apply(qSBuilder.queryOptions())
+        }
         def apply(qBuilder: SolrQueryBuilder): Select = new Select(qBuilder.toParams, RequestOptions())
         def Streaming(query: SolrParams): Select = {
             new Select(query, RequestOptions(responseType = SolrResponseTypes.Streaming))
+        }
+        def Streaming(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = {
+            Streaming(qSBuilder.queryOptions())
         }
         def Streaming(qBuilder: SolrQueryBuilder): Select = {
             new Select(qBuilder.toParams, RequestOptions(responseType = SolrResponseTypes.Streaming))

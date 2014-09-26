@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Sep 25, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -80,7 +80,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
     private def sendError(err: Throwable) = {
         replyTo ! Status.Failure(err)
-        context stop self
+        self ! PoisonPill
     }
 
     private def createQueryRequest = {
@@ -255,7 +255,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
         case Parsed(result) ⇒
             replyTo ! SolrQueryResponse(request, result)
-            context stop self
+            self ! PoisonPill
 
         case m ⇒
             log.warning("Unhandled message: {}", m)

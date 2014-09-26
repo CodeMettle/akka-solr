@@ -126,7 +126,7 @@ val req = Solr.Update() addDoc doc commitWithin 42.seconds
 
 ### Sending Requests:
 
-A Connection actor is requested with `Solr.Client.clientTo()`. The connection accepts `Solr.SolrOperation` messages. `Solr.Client.manager` can also accept `Solr.Request` objects
+A Connection actor is requested with `Solr.Client.clientTo()`. The connection accepts `Solr.SolrOperation` messages. `Solr.Client.manager` can also accept `Solr.Request` objects which will create connections as needed.
 
 ```scala
 val req: Solr.SolrOperation = ???
@@ -154,6 +154,23 @@ val responseF: Future[SolrQueryResponse] = (connectionActor ? req).mapTo[SolrQue
 ```
 
 Errors can be raised from Spray (which should be `Http.ConnectionException` errors) or from akka-solr (which should be `Solr.AkkaSolrError`s - `InvalidUrl`, `RequestTimedOut`, etc)
+
+### Streaming Requests:
+
+akka-solr can use Solr's chunking/streaming mechanism to send query results to an actor as they are received and parsed. The behavior is similar to SolrJ's `SolrServer.queryAndStreamResponse`.
+
+```scala
+val req = Solr.Select(qs).streaming
+connection ! req
+// or
+Solr.Client.manager ! Solr.Request(solrUrl, req)
+def receive = {
+    case SolrResultInfo(numFound, start, maxScore) ⇒ // received first
+    case doc: AkkaSolrDocument ⇒ // documents are received
+    case res: SolrQueryResponse ⇒ // response is sent last and has no documents; (connection ? req) returns Future[SolrQueryResponse]
+}
+
+```
 
 Testability
 -----------

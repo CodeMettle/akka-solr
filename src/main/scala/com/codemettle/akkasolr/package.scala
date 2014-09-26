@@ -7,7 +7,9 @@
  */
 package com.codemettle
 
+import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.params.{SolrParams, CommonParams}
+import org.apache.solr.common.util.NamedList
 import spray.http.Uri
 
 import akka.actor.ActorRefFactory
@@ -45,6 +47,8 @@ package object akkasolr {
             Uri.Query((sp.getParameterNamesIterator.asScala flatMap paramToKVs).toSeq: _*)
         }
     }
+
+    implicit def nlToQueryResp(nl: NamedList[AnyRef]) = new QueryResponse(nl, null)
 
     def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem
 }

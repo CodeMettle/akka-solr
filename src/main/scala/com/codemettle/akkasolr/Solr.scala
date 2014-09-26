@@ -89,6 +89,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
     object Select {
         def apply(query: SolrParams): Select = new Select(query, RequestOptions())
+        def apply(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = apply(qSBuilder.queryOptions())
         def apply(qBuilder: SolrQueryBuilder): Select = new Select(qBuilder.toParams, RequestOptions())
         def Streaming(query: SolrParams): Select = {
             new Select(query, RequestOptions(responseType = SolrResponseTypes.Streaming))
@@ -101,7 +102,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class Ping(action: Option[Ping.Action] = None,
                     options: RequestOptions = RequestOptions(method = RequestMethods.GET, requestTimeout = 5.seconds))
-        extends SolrOperation
+        extends SolrOperation {
+        def withAction(action: Ping.Action) = copy(action = Some(action))
+    }
 
     @SerialVersionUID(1L)
     case class Commit(waitForSearcher: Boolean = true, softCommit: Boolean = false,

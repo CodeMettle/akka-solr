@@ -13,6 +13,7 @@ object Deps {
     val akkaSlf = "com.typesafe.akka" %% "akka-slf4j" % Versions.akka
     val akkaTest = "com.typesafe.akka" %% "akka-testkit" % Versions.akka
     val guava = "com.google.guava" % "guava" % Versions.guava
+    val jclOverSlf4j = "org.slf4j" % "jcl-over-slf4j" % Versions.slf4j
     val logback = "ch.qos.logback" % "logback-classic" % Versions.logback
     val scalaTest = "org.scalatest" %% "scalatest" % Versions.scalaTest
     val solrj = "org.apache.solr" % "solr-solrj" % Versions.solr

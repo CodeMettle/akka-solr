@@ -18,6 +18,8 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
     Deps.akkaSlf,
     Deps.akkaTest,
+    Deps.solrj, // explicitly include even though not technically needed
+    Deps.jclOverSlf4j,
     Deps.guava,
     Deps.logback,
     Deps.scalaTest
@@ -29,6 +31,8 @@ libraryDependencies += {
         case Some((2, 11)) => Deps.ficus2_11
     }
 } % "test"
+
+publishArtifact in Test := true
 
 autoAPIMappings := true
 

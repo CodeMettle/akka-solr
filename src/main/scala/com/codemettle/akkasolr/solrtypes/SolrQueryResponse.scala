@@ -35,9 +35,3 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
         })).toMap
     })
 }
-
-object SolrQueryResponse {
-    def apply(req: Solr.SolrOperation, nl: NamedList[AnyRef]): SolrQueryResponse = {
-        SolrQueryResponse(req, new QueryResponse(nl, null))
-    }
-}

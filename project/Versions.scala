@@ -11,6 +11,7 @@ object Versions {
     val guava = "18.0"
     val logback = "1.1.2"
     val scalaTest = "2.2.1"
+    val slf4j = "1.7.7"
     val solr = "4.5.1"
     val spray = "1.3.1"
 

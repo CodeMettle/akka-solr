@@ -3,7 +3,7 @@ organization := "com.codemettle.akka-solr"
 
 name := "akka-solr"
 
-version := "0.0.9-SNAPSHOT"
+version := "0.9.0-SNAPSHOT"
 
 scalaVersion := "2.11.2"
 

@@ -75,12 +75,12 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         parts3.render should equal ("(-(any:1 OR any:2) AND -(f:v OR f2:v2))")
     }
 
-    it should "throw an error if IsAnyOf is too large" in {
+    it should "split IsAnyOf requests if they are too large" in {
         val parts = IsAnyOf(Some("f"), List(1, 2, 3, 4, 5))
 
         parts.render shouldBe a[String]
 
-        an[IllegalArgumentException] shouldBe thrownBy (parts.copy(values = 0 :: parts.values.toList).render)
+        parts.copy(values = 0 :: parts.values.toList).render should equal ("((f:0 OR f:1 OR f:2 OR f:3 OR f:4) OR (f:5))")
     }
 
     it should "have a working DSL" in {

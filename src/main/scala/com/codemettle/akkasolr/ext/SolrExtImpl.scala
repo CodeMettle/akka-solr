@@ -1,7 +1,7 @@
 /*
  * SolrExtImpl.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -32,6 +32,12 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     val responseParserDispatcher = eas.dispatchers lookup "akkasolr.response-parser-dispatcher"
 
     val maxBooleanClauses = eas.settings.config.getInt("akkasolr.solrMaxBooleanClauses")
+
+    val maxChunkSize = {
+        val size = eas.settings.config.getBytes("akkasolr.sprayMaxChunkSize")
+        if (size > Int.MaxValue || size < 0) sys.error("Invalid maxChunkSize")
+        size.toInt
+    }
 
     /**
      * Request a Solr connection actor. A connection will be created if needed.

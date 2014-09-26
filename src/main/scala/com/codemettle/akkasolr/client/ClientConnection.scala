@@ -1,7 +1,7 @@
 /*
  * ClientConnection.scala
  *
- * Updated: Sep 23, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -11,6 +11,7 @@ package client
 import org.apache.solr.client.solrj.response.QueryResponse
 import spray.can.Http
 import spray.can.client.{ClientConnectionSettings, HostConnectorSettings}
+import spray.can.parsing.ParserSettings
 import spray.http._
 
 import com.codemettle.akkasolr.Solr.SolrOperation
@@ -49,8 +50,13 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     private val actorName = Util actorNamer "request"
 
+    private def parserSettings = {
+        ParserSettings(context.system).copy(maxChunkSize = Solr.Client.maxChunkSize)
+    }
+
     private def connSettings = {
-        ClientConnectionSettings(context.system).copy(responseChunkAggregationLimit = 0)
+        ClientConnectionSettings(context.system)
+            .copy(responseChunkAggregationLimit = 0, parserSettings = parserSettings)
     }
 
     private def hostConnSettings = {
@@ -59,7 +65,6 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     private def serviceRequest(hostConn: ActorRef, request: SolrOperation, requestor: ActorRef,
                                timeout: FiniteDuration) = {
-        //log.warning("Unimplemented; conn={}, req={}, reply={}", stateData.hostConn, request, requestor)
         context.actorOf(RequestHandler.props(baseUri, hostConn, requestor, request, timeout), actorName.next())
     }
 
@@ -89,10 +94,8 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             stasher ! ConnectingStasher.WaitingRequest(act, req, remainingTimeout)
             stay()
 
-        case Event(m, data) ⇒
-            val connected = if (data.hostConn != null) "established" else "not established"
-            log.warning("Unhandled message, connection {}; message: {}", connected, m)
-            stay()
+        case Event(m, _) ⇒
+            stay() replying Status.Failure(Solr.InvalidRequest(m.toString))
     }
 
     private def handleConnExc: StateFunction = {

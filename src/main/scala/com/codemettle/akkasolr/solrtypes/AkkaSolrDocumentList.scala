@@ -1,13 +1,13 @@
 /*
  * AkkaSolrDocumentList.scala
  *
- * Updated: Sep 23, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
 package com.codemettle.akkasolr.solrtypes
 
-import org.apache.solr.common.SolrDocumentList
+import org.apache.solr.common.{SolrDocument, SolrDocumentList}
 
 import scala.collection.JavaConverters._
 
@@ -16,13 +16,16 @@ import scala.collection.JavaConverters._
  *
  */
 @SerialVersionUID(1L)
-case class AkkaSolrDocumentList(original: SolrDocumentList) {
+case class AkkaSolrDocumentList(original: Option[SolrDocumentList]) {
     @transient
-    val resultInfo = SolrResultInfo(original.getNumFound, original.getStart, original.getMaxScore)
+    val resultInfo = {
+        original.fold(SolrResultInfo(-1, -1, None))(o ⇒ SolrResultInfo(o.getNumFound, o.getStart, o.getMaxScore))
+    }
 
     def numFound = resultInfo.numFound
     def start = resultInfo.start
     def maxScore = resultInfo.maxScore
 
-    def documents = original.asScala map AkkaSolrDocument.apply
+    @transient
+    lazy val documents = original.fold(Seq.empty[SolrDocument])(o ⇒ o.asScala) map AkkaSolrDocument.apply
 }

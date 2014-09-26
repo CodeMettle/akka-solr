@@ -1,7 +1,7 @@
 /*
  * SolrQueryResponse.scala
  *
- * Updated: Sep 23, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -24,7 +24,7 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
     lazy val header = SolrQueryResponseHeader(original.getHeader)
 
     @transient
-    lazy val results = AkkaSolrDocumentList(original.getResults)
+    lazy val results = AkkaSolrDocumentList(Option(original.getResults))
 
     @transient
     lazy val facetFields = Option(original.getFacetFields) map (ffs ⇒ {

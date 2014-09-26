@@ -1,7 +1,7 @@
 /*
  * SolrQueryStringBuilder.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -19,7 +19,7 @@ object SolrQueryStringBuilder {
     type FieldValueType = Any
 
     sealed trait QueryPart {
-        def toQuery()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render(this))
+        def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render(this))
     }
 
     case class FieldBuilder(field: Option[String]) {
@@ -76,16 +76,18 @@ object SolrQueryStringBuilder {
         case Not(q) ⇒ s"-${render(q)}"
         case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
         case IsAnyOf(field, values) ⇒
-            if (values.size > Solr.Client.maxBooleanClauses)
-                throw new IllegalArgumentException(
-                    s"akkasolr.solrMaxBooleanClauses=${Solr.Client.maxBooleanClauses} but given ${values.size} values")
-
-            val fieldVals = {
-                field match {
-                    case Some(f) ⇒ values map (v ⇒ f + ':' + valueEsc(v))
-                    case None ⇒ values map (v ⇒ valueEsc(v))
+            def valsToOr(vals: Iterable[FieldValueType]) = {
+                val fieldVals = {
+                    field match {
+                        case Some(f) ⇒ vals map (v ⇒ f + ':' + valueEsc(v))
+                        case None ⇒ vals map (v ⇒ valueEsc(v))
+                    }
                 }
+                fieldVals.mkString("(", " OR ", ")")
             }
-            fieldVals.mkString("(", " OR ", ")")
+            if (values.size <= Solr.Client.maxBooleanClauses)
+                valsToOr(values)
+            else
+                ((values grouped Solr.Client.maxBooleanClauses) map valsToOr).mkString("(", " OR ", ")")
     }
 }

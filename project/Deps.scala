@@ -1,7 +1,7 @@
 /*
  * Deps.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Sep 26, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -17,7 +17,6 @@ object Deps {
     val scalaTest = "org.scalatest" %% "scalatest" % Versions.scalaTest
     val solrj = "org.apache.solr" % "solr-solrj" % Versions.solr
     val sprayCan = "io.spray" %% "spray-can" % Versions.spray
-    val sprayClient = "io.spray" %% "spray-client" % Versions.spray
 
     val ficus2_10 = "net.ceedubs" %% "ficus" % Versions.ficus2_10
     val ficus2_11 = "net.ceedubs" %% "ficus" % Versions.ficus2_11

@@ -1,3 +1,6 @@
+import SonatypeKeys._
+
+// Metadata
 
 organization := "com.codemettle.akka-solr"
 
@@ -5,9 +8,39 @@ name := "akka-solr"
 
 version := "0.9.0-SNAPSHOT"
 
+description := "Solr HTTP client using Akka and Spray"
+
+startYear := Some(2014)
+
+homepage := Some(url("https://github.com/CodeMettle/akka-solr"))
+
+organizationName := "CodeMettle, LLC"
+
+organizationHomepage := Some(url("http://www.codemettle.com"))
+
+licenses += ("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
+
+scmInfo := Some(
+    ScmInfo(url("https://github.com/CodeMettle/akka-solr"), "scm:git:https://github.com/CodeMettle/akka-solr.git",
+        Some("scm:git:git@github.com:CodeMettle/akka-solr.git")))
+
+pomExtra := {
+    <developers>
+        <developer>
+            <name>Steven Scott</name>
+            <email>steven@codemettle.com</email>
+            <url>https://github.com/codingismy11to7/</url>
+        </developer>
+    </developers>
+}
+
+// Build
+
 scalaVersion := "2.11.2"
 
 crossScalaVersions := Seq("2.10.4", "2.11.2")
+
+scalacOptions ++= Seq("-unchecked", "-feature", "-deprecation")
 
 libraryDependencies ++= Seq(
     Deps.akkaActor,
@@ -53,3 +86,9 @@ apiMappings ++= {
         findManagedDependency("com.typesafe.akka", "akka-actor") -> url(s"http://doc.akka.io/api/akka/${Versions.akka}/")
     )
 }
+
+// Publish
+
+xerial.sbt.Sonatype.sonatypeSettings
+
+profileName := "com.codemettle"

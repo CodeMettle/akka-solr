@@ -183,6 +183,7 @@ Plans
 -----
 
 * Tests - I'm not a unit-testing expert, any help is appreciated
+* ZooKeeper support (ala CloudSolrServer)
 * Add more Scala-friendly request/response wrappers as requested.
   * Sub-queries? (can provide queries without using builders)
   * document field weights? (can provide queries without using builders)

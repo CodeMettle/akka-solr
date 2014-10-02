@@ -1,7 +1,7 @@
 /*
  * SolrQueryBuilder.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Oct 2, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -138,6 +138,17 @@ object SolrQueryBuilder {
         def asc = ascending
         def descending = new SortClause(f, SolrQuery.ORDER.desc)
         def desc = descending
+    }
+
+    def fromSolrQuery(params: SolrQuery) = {
+        def rows = Option(params.getRows) map (_.intValue())
+        def start = Option(params.getStart) map (_.intValue())
+        def fields = Option(params.getFields) map (_.split("\\s*,\\s*").toVector) getOrElse Vector.empty
+        def sorts = params.getSorts.asScala.toVector
+        def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
+        def exeTime = Option(params.getTimeAllowed) map (_.intValue())
+
+        SolrQueryBuilder(params.getQuery, rows, start, fields, sorts, facetFields, exeTime)
     }
 
     /*

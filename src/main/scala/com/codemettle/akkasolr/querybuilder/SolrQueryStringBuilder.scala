@@ -21,14 +21,24 @@ object SolrQueryStringBuilder {
     sealed trait QueryPart {
         def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render)
 
+        private def andOrRender(parts: Seq[QueryPart], joiner: String)(implicit arf: ActorRefFactory) = {
+            val nonEmpty = parts filterNot (_ eq Empty)
+            if (nonEmpty.isEmpty)
+                ""
+            else if (nonEmpty.size == 1)
+                nonEmpty.head.render
+            else
+                nonEmpty map (_.render) mkString ("(", joiner, ")")
+        }
+
         def render(implicit arf: ActorRefFactory): String = this match {
             case Empty ⇒ ""
             case RawQuery(q) ⇒ q
             case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
-            case OrQuery(parts) ⇒ parts map (_.render) mkString ("(", " OR ", ")")
-            case AndQuery(parts) ⇒ parts map (_.render) mkString ("(", " AND ", ")")
             case Not(q) ⇒ s"-${q.render}"
             case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
+            case OrQuery(parts) ⇒ andOrRender(parts, " OR ")
+            case AndQuery(parts) ⇒ andOrRender(parts, " AND ")
             case IsAnyOf(field, values) ⇒
                 def valsToOr(vals: Iterable[FieldValueType]) = {
                     val fieldVals = {

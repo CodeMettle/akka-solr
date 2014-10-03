@@ -129,4 +129,40 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         q.query should equal ("(f1:3 AND -f2:x AND ((1 OR 2) OR -f3:4 OR time:[3 TO 5]))")
     }
+
+    "Empty" should "be left out of AND and OR queries" in {
+        import SolrQueryStringBuilder.Methods._
+
+        val q = AND (
+            Empty,
+            defaultField() := "*"
+        )
+
+        q.render should equal ("*")
+
+        val q2 = AND (
+            Empty,
+            defaultField() := "*",
+            Empty,
+            field("a") := "b"
+        )
+
+        q2.render should equal ("(* AND a:b)")
+
+        val q3 = OR (
+            defaultField() := "*",
+            Empty
+        )
+
+        q3.render should equal ("*")
+
+        val q4 = OR (
+            defaultField() := "*",
+            Empty,
+            field("a") := "b",
+            Empty
+        )
+
+        q4.render should equal ("(* OR a:b)")
+    }
 }

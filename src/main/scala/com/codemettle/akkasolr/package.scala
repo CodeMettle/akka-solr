@@ -1,7 +1,7 @@
 /*
  * package.scala
  *
- * Updated: Sep 19, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -13,6 +13,7 @@ import org.apache.solr.common.util.NamedList
 import spray.http.Uri
 
 import akka.actor.ActorRefFactory
+import scala.concurrent.duration.Duration
 
 /**
  * @author steven
@@ -51,4 +52,9 @@ package object akkasolr {
     implicit def nlToQueryResp(nl: NamedList[AnyRef]) = new QueryResponse(nl, null)
 
     def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem
+
+    // add this for 2.10 compilation
+    implicit class DurationWithCoarsest(val d: Duration) extends AnyVal {
+        def toCoarsest = d
+    }
 }

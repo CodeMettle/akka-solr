@@ -1,7 +1,7 @@
 /*
  * SolrExtImpl.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -9,6 +9,7 @@ package com.codemettle.akkasolr.ext
 
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.Solr.SolrConnection
+import com.codemettle.akkasolr.imperative.ImperativeWrapper
 import com.codemettle.akkasolr.manager.Manager
 import com.codemettle.akkasolr.util.Util
 
@@ -96,5 +97,15 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
 
             case Failure(t) ⇒ Future failed t
         }
+    }
+
+    /**
+     * Creates an [[ImperativeWrapper]], useful for transitioning from other Solr libraries
+     *
+     * @see [[clientFutureTo]]
+     * @return a [[Future]] containing an [[ImperativeWrapper]] around the akka-solr client connection
+     */
+    def imperativeClientTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
+        clientFutureTo(solrUrl) map ImperativeWrapper
     }
 }

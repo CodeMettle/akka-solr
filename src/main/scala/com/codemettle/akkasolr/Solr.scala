@@ -1,7 +1,7 @@
 /*
  * Solr.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -158,6 +158,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         }
 
         def overwrite(o: Boolean) = copy(updateOptions = updateOptions.copy(overwrite = o))
+
+        def withOptions(opts: RequestOptions) = copy(options = opts)
     }
 
     object Update {

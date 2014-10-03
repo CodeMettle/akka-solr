@@ -1,7 +1,7 @@
 /*
  * SolrQueryResponse.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -34,4 +34,10 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
             }
         })).toMap
     })
+
+    @transient
+    lazy val status = original.getStatus
+
+    @transient
+    lazy val qTime = original.getQTime
 }

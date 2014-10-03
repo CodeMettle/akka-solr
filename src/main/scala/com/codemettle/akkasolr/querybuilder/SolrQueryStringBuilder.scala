@@ -1,7 +1,7 @@
 /*
  * SolrQueryStringBuilder.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -39,6 +39,9 @@ object SolrQueryStringBuilder {
         def AND(qps: QueryPart*) = AndQuery(qps)
         def OR(qps: QueryPart*) = OrQuery(qps)
         def NOT(qp: QueryPart) = Not(qp)
+
+        import scala.language.implicitConversions
+        implicit def qpToQb(qp: QueryPart)(implicit arf: ActorRefFactory) = qp.queryOptions()
     }
 
     object Methods extends BuilderMethods

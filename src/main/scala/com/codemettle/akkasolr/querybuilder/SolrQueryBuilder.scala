@@ -1,7 +1,7 @@
 /*
  * SolrQueryBuilder.scala
  *
- * Updated: Oct 2, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -46,7 +46,7 @@ case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt
 
     def withQuery(q: String) = copy(query = q)
 
-    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = SolrQueryStringBuilder render qp)
+    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = qp.render)
 
     def rows(r: Int) = copy(rowsOpt = Some(r))
 

@@ -1,7 +1,7 @@
 /*
  * TestSolrQueryStringBuilder.scala
  *
- * Updated: Sep 22, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -13,21 +13,14 @@ import org.scalatest._
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder._
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.testkit.TestKit
 
 /**
  * @author steven
  *
  */
-object TestSolrQueryStringBuilder {
-    implicit class QP(val q: QueryPart) extends AnyVal {
-        def render(implicit arf: ActorRefFactory) = SolrQueryStringBuilder render q
-    }
-}
-
 class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) with FlatSpecLike with Matchers {
-    import TestSolrQueryStringBuilder.QP
 
     def this() = this(ActorSystem("Test",
         ConfigFactory parseString "akkasolr.solrMaxBooleanClauses=5" withFallback ConfigFactory.load()))
@@ -84,7 +77,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     it should "have a working DSL" in {
-        import SolrQueryStringBuilder.Methods._
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         val p = defaultField() := 3
 

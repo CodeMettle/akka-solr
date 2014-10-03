@@ -19,7 +19,30 @@ object SolrQueryStringBuilder {
     type FieldValueType = Any
 
     sealed trait QueryPart {
-        def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render(this))
+        def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render)
+
+        def render(implicit arf: ActorRefFactory): String = this match {
+            case RawQuery(q) ⇒ q
+            case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
+            case OrQuery(parts) ⇒ parts map (_.render) mkString ("(", " OR ", ")")
+            case AndQuery(parts) ⇒ parts map (_.render) mkString ("(", " AND ", ")")
+            case Not(q) ⇒ s"-${q.render}"
+            case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
+            case IsAnyOf(field, values) ⇒
+                def valsToOr(vals: Iterable[FieldValueType]) = {
+                    val fieldVals = {
+                        field match {
+                            case Some(f) ⇒ vals map (v ⇒ f + ':' + valueEsc(v))
+                            case None ⇒ vals map (v ⇒ valueEsc(v))
+                        }
+                    }
+                    fieldVals.mkString("(", " OR ", ")")
+                }
+                if (values.size <= Solr.Client.maxBooleanClauses)
+                    valsToOr(values)
+                else
+                    ((values grouped Solr.Client.maxBooleanClauses) map valsToOr).mkString("(", " OR ", ")")
+        }
     }
 
     case class FieldBuilder(field: Option[String]) {
@@ -41,7 +64,7 @@ object SolrQueryStringBuilder {
         def NOT(qp: QueryPart) = Not(qp)
 
         import scala.language.implicitConversions
-        implicit def qpToQb(qp: QueryPart)(implicit arf: ActorRefFactory) = qp.queryOptions()
+        implicit def queryPartToQueryBuilder(qp: QueryPart)(implicit arf: ActorRefFactory) = qp.queryOptions()
     }
 
     object Methods extends BuilderMethods
@@ -69,28 +92,5 @@ object SolrQueryStringBuilder {
             else s
 
         case _ ⇒ value.toString
-    }
-
-    def render(qp: QueryPart)(implicit arf: ActorRefFactory): String = qp match {
-        case RawQuery(q) ⇒ q
-        case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
-        case OrQuery(parts) ⇒ parts map render mkString ("(", " OR ", ")")
-        case AndQuery(parts) ⇒ parts map render mkString ("(", " AND ", ")")
-        case Not(q) ⇒ s"-${render(q)}"
-        case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
-        case IsAnyOf(field, values) ⇒
-            def valsToOr(vals: Iterable[FieldValueType]) = {
-                val fieldVals = {
-                    field match {
-                        case Some(f) ⇒ vals map (v ⇒ f + ':' + valueEsc(v))
-                        case None ⇒ vals map (v ⇒ valueEsc(v))
-                    }
-                }
-                fieldVals.mkString("(", " OR ", ")")
-            }
-            if (values.size <= Solr.Client.maxBooleanClauses)
-                valsToOr(values)
-            else
-                ((values grouped Solr.Client.maxBooleanClauses) map valsToOr).mkString("(", " OR ", ")")
     }
 }

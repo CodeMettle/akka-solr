@@ -42,7 +42,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
      */
     def createQuery(q: String) = SolrQueryBuilder(q)
 
-    def createQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = SolrQueryBuilder(SolrQueryStringBuilder render qp)
+    def createQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = SolrQueryBuilder(qp.render)
 
     /**
      * Create an empty Solr Query String builder
@@ -127,12 +127,22 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class Commit(waitForSearcher: Boolean = true, softCommit: Boolean = false,
-                      options: RequestOptions) extends SolrOperation
+    case class Commit(waitForSearcher: Boolean, softCommit: Boolean, options: RequestOptions) extends SolrOperation
+
+    object Commit {
+        def apply(waitForSearcher: Boolean = true, softCommit: Boolean = false)(implicit arf: ActorRefFactory): Commit = {
+            apply(waitForSearcher, softCommit, RequestOptions(actorSystem))
+        }
+    }
 
     @SerialVersionUID(1L)
-    case class Optimize(waitForSearcher: Boolean = true, maxSegments: Int = 1,
-                        options: RequestOptions) extends SolrOperation
+    case class Optimize(waitForSearcher: Boolean, maxSegments: Int, options: RequestOptions) extends SolrOperation
+
+    object Optimize {
+        def apply(waitForSearcher: Boolean = true, maxSegments: Int = 1)(implicit arf: ActorRefFactory): Optimize = {
+            apply(waitForSearcher, maxSegments, RequestOptions(actorSystem))
+        }
+    }
 
     @SerialVersionUID(1L)
     case class Rollback(options: RequestOptions) extends SolrOperation
@@ -150,7 +160,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def deleteByQuery(q: String) = copy(deleteQueries = deleteQueries :+ q)
 
         def deleteByQuery(qb: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory) = {
-            copy(deleteQueries = deleteQueries :+ (SolrQueryStringBuilder render qb))
+            copy(deleteQueries = deleteQueries :+ qb.render)
         }
 
         def commit(c: Boolean) = copy(updateOptions = updateOptions.copy(commit = c))
@@ -188,7 +198,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         }
 
         def DeleteByQuery(queries: SolrQueryStringBuilder.QueryPart*)(implicit arf: ActorRefFactory) = {
-            Update(deleteQueries = (queries map SolrQueryStringBuilder.render).toVector,
+            Update(deleteQueries = (queries map (_.render)).toVector,
                 options = RequestOptions(actorSystem),
                 updateOptions = UpdateOptions(actorSystem))
         }
@@ -237,8 +247,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         @SerialVersionUID(1L)
         case object Disable extends Action
 
-        def apply(action: Option[Ping.Action] = None)(implicit arf: ActorRefFactory): Ping = {
-            apply(action, RequestOptions(actorSystem).copy(method = RequestMethods.GET, requestTimeout = 5.seconds))
+        def apply(action: Ping.Action = null)(implicit arf: ActorRefFactory): Ping = {
+            apply(Option(action), RequestOptions(actorSystem).copy(method = RequestMethods.GET, requestTimeout = 5.seconds))
         }
     }
 

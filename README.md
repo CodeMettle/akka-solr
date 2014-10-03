@@ -58,19 +58,22 @@ A builder is provided as part of akka-solr, any improvements are welcome.
 #### Building Solr query strings
 
 ```scala
-val qs = Solr.queryStringBuilder rawQuery "my custom query"
-val qs = Solr.queryStringBuilder defaultField() := "wantthis"
-val qs = Solr.queryStringBuilder defaultField() :!= "dontwantthis"
-val qs = Solr.queryStringBuilder field "myfield" := "requiredvalue"
-val qs = Solr.queryStringBuilder field "myfield" isAnyOf ("1", "2")
-val qs = Solr.queryStringBuilder field "mylong" isInRange (12345, 98765)
-val qs = Solr.queryStringBuilder field "requiredField" exists()
-val qs = Solr.queryStringBuilder field "illegalField" doesNotExist()
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+val qs = rawQuery("my custom query")
+val qs = defaultField() := "wantthis"
+val qs = defaultField() :!= "dontwantthis"
+val qs = field("myfield") := "requiredvalue"
+val qs = field("myfield") isAnyOf ("1", "2")
+val qs = field("mylong") isInRange (12345, 98765)
+val qs = field("requiredField") exists()
+val qs = field("illegalField") doesNotExist()
 ```
+
 ```scala
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
-val qs = Solr.queryStringBuilder AND (
+val qs = AND (
     field ("x") := "y",
     defaultField() :!= "3",
     NOT(field ("z") := 2),
@@ -85,28 +88,29 @@ val qs = Solr.queryStringBuilder AND (
 #### Building queries with options
 
 ```scala
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.FieldStrToSort
 
-val query = qs queryOptions() start 50 rows 25 facets ("a", "b") fields ("f1", "f2") sortBy "f1".desc
-
+val qs: QueryPart = ???
+val query = qs start 50 rows 25 facets ("a", "b") fields ("f1", "f2") sortBy "f1".desc
 ```
 
 ### Building Requests:
 
 ```scala
-val req = Solr.Ping(options = Solr.RequestOptions(method = RequestMethods.GET, responseType = SolrResponseTypes.XML, requestTimeout = 5.seconds))
+val req = Solr.Ping(action = None, options = Solr.RequestOptions(method = RequestMethods.GET, responseType = SolrResponseTypes.XML, requestTimeout = 5.seconds))
 
 val req = Solr.Ping()
 val req = Solr.Ping(Solr.Ping.Enable)
 
 val req = Solr.Commit(waitForSearcher = false, softCommit = true)
 val req = Solr.Optimize(waitForSearcher = false, maxSegments = 2)
-val req = Solr.Rollback(options = Solr.RequestOptions(method = RequestMethods.POST, responseType = SolrResponseTypes.Binary))
+val req = Solr.Rollback(options = Solr.RequestOptions(actorSystem).copy(method = RequestMethods.POST, responseType = SolrResponseTypes.Binary))
 
 val req = Solr.Select(qs)
 val req = Solr.Select.Streaming(qs)
 val req = Solr.Select(qs).streaming
-val req = Solr.Select(qs).streaming withOptions Solr.RequestOptions(requestTimeout = 15.seconds)
+val req = Solr.Select(qs).streaming withOptions Solr.RequestOptions(actorSystem).copy(requestTimeout = 15.seconds)
 
 val req = Solr.Update DeleteById ("id1", "id2")
 val req = Solr.Update() deleteById "id1" deleteByQuery (Solr.queryStringBuilder defaultField() := "blah")

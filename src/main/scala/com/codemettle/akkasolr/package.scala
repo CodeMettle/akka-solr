@@ -49,6 +49,7 @@ package object akkasolr {
         }
     }
 
+    import scala.language.implicitConversions
     implicit def nlToQueryResp(nl: NamedList[AnyRef]) = new QueryResponse(nl, null)
 
     def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem

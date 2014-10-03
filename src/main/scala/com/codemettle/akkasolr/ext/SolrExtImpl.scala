@@ -103,7 +103,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * Creates an [[ImperativeWrapper]], useful for transitioning from other Solr libraries
      *
      * @see [[clientFutureTo]]
-     * @return a [[Future]] containing an [[ImperativeWrapper]] around the akka-solr client connection
+     * @return a [[Future]] containing an [[com.codemettle.akkasolr.imperative.ImperativeWrapper]] around the
+     *         akka-solr client connection
      */
     def imperativeClientTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
         clientFutureTo(solrUrl) map (a ⇒ ImperativeWrapper(a)(eas))

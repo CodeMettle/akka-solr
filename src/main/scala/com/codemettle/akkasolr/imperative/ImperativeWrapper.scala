@@ -11,6 +11,7 @@ package imperative
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.SolrParams
 
+import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder
 import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
 
 import akka.actor.{ActorRef, ActorRefFactory}
@@ -34,8 +35,20 @@ case class ImperativeWrapper(connection: ActorRef)(implicit arf: ActorRefFactory
 
     // Shortcut methods
 
-    def query(q: SolrParams, options: Solr.RequestOptions = Solr.RequestOptions(actorSystem)) = {
+    def query(q: SolrParams) = {
+        call(Solr.Select(q))
+    }
+
+    def query(q: SolrQueryBuilder) = {
+        call(Solr.Select(q))
+    }
+
+    def queryWithOptions(q: SolrParams, options: Solr.RequestOptions) = {
         call(Solr.Select(q, options))
+    }
+
+    def queryWithOptions(q: SolrQueryBuilder, options: Solr.RequestOptions) = {
+        call(Solr.Select(q) withOptions options)
     }
 
     def ping(options: Solr.RequestOptions = Solr.RequestOptions(actorSystem).copy(method = Solr.RequestMethods.GET, requestTimeout = 5.seconds)) = {

@@ -106,6 +106,6 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return a [[Future]] containing an [[ImperativeWrapper]] around the akka-solr client connection
      */
     def imperativeClientTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
-        clientFutureTo(solrUrl) map ImperativeWrapper
+        clientFutureTo(solrUrl) map (a ⇒ ImperativeWrapper(a)(eas))
     }
 }

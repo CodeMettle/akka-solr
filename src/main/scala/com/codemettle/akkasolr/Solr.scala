@@ -7,9 +7,11 @@
  */
 package com.codemettle.akkasolr
 
+import com.typesafe.config.Config
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.SolrParams
-import spray.http.{Uri, StatusCode}
+import spray.http.StatusCode
+import spray.util.SettingsCompanion
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
@@ -99,44 +101,46 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     object Select {
-        def apply(query: SolrParams): Select = new Select(query, RequestOptions())
+        def apply(query: SolrParams)(implicit arf: ActorRefFactory): Select = {
+            new Select(query, RequestOptions(actorSystem))
+        }
         def apply(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = {
             apply(qSBuilder.queryOptions())
         }
-        def apply(qBuilder: SolrQueryBuilder): Select = new Select(qBuilder.toParams, RequestOptions())
-        def Streaming(query: SolrParams): Select = {
-            new Select(query, RequestOptions(responseType = SolrResponseTypes.Streaming))
+        def apply(qBuilder: SolrQueryBuilder)(implicit arf: ActorRefFactory): Select = {
+            new Select(qBuilder.toParams, RequestOptions(actorSystem))
+        }
+        def Streaming(query: SolrParams)(implicit arf: ActorRefFactory): Select = {
+            new Select(query, RequestOptions(actorSystem).copy(responseType = SolrResponseTypes.Streaming))
         }
         def Streaming(qSBuilder: SolrQueryStringBuilder.QueryPart)(implicit arf: ActorRefFactory): Select = {
             Streaming(qSBuilder.queryOptions())
         }
-        def Streaming(qBuilder: SolrQueryBuilder): Select = {
-            new Select(qBuilder.toParams, RequestOptions(responseType = SolrResponseTypes.Streaming))
+        def Streaming(qBuilder: SolrQueryBuilder)(implicit arf: ActorRefFactory): Select = {
+            new Select(qBuilder.toParams, RequestOptions(actorSystem).copy(responseType = SolrResponseTypes.Streaming))
         }
     }
 
     @SerialVersionUID(1L)
-    case class Ping(action: Option[Ping.Action] = None,
-                    options: RequestOptions = RequestOptions(method = RequestMethods.GET, requestTimeout = 5.seconds))
-        extends SolrOperation {
+    case class Ping(action: Option[Ping.Action], options: RequestOptions) extends SolrOperation {
         def withAction(action: Ping.Action) = copy(action = Some(action))
     }
 
     @SerialVersionUID(1L)
     case class Commit(waitForSearcher: Boolean = true, softCommit: Boolean = false,
-                      options: RequestOptions = RequestOptions()) extends SolrOperation
+                      options: RequestOptions) extends SolrOperation
 
     @SerialVersionUID(1L)
     case class Optimize(waitForSearcher: Boolean = true, maxSegments: Int = 1,
-                        options: RequestOptions = RequestOptions()) extends SolrOperation
+                        options: RequestOptions) extends SolrOperation
 
     @SerialVersionUID(1L)
-    case class Rollback(options: RequestOptions = RequestOptions()) extends SolrOperation
+    case class Rollback(options: RequestOptions) extends SolrOperation
 
-    @SerialVersionUID(1L)
+        @SerialVersionUID(1L)
     case class Update(addDocs: Vector[SolrInputDocument] = Vector.empty, deleteIds: Vector[String] = Vector.empty,
-                      deleteQueries: Vector[String] = Vector.empty, updateOptions: UpdateOptions = UpdateOptions(),
-                      options: RequestOptions = RequestOptions()) extends SolrOperation {
+                      deleteQueries: Vector[String] = Vector.empty, updateOptions: UpdateOptions,
+                      options: RequestOptions) extends SolrOperation {
         def addDoc(doc: Map[String, AnyRef]) = copy(addDocs = addDocs ++ Util.createSolrInputDocs(doc))
 
         def addDoc(doc: SolrInputDocument) = copy(addDocs = addDocs :+ doc)
@@ -160,27 +164,39 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def overwrite(o: Boolean) = copy(updateOptions = updateOptions.copy(overwrite = o))
 
         def withOptions(opts: RequestOptions) = copy(options = opts)
+
+        def withUpdateOptions(opts: UpdateOptions) = copy(updateOptions = opts)
     }
 
     object Update {
-        def AddSolrDocs(docs: SolrInputDocument*) = {
-            Update(addDocs = docs.toVector)
+        def AddSolrDocs(docs: SolrInputDocument*)(implicit arf: ActorRefFactory) = {
+            Update(addDocs = docs.toVector,
+                options = RequestOptions(actorSystem),
+                updateOptions = UpdateOptions(actorSystem))
         }
 
-        def AddDocs(docs: Map[String, AnyRef]*) = {
-            Update(addDocs = Util.createSolrInputDocs(docs: _*).toVector)
+        def AddDocs(docs: Map[String, AnyRef]*)(implicit arf: ActorRefFactory) = {
+            Update(addDocs = Util.createSolrInputDocs(docs: _*).toVector,
+                options = RequestOptions(actorSystem),
+                updateOptions = UpdateOptions(actorSystem))
         }
 
-        def DeleteById(ids: String*) = {
-            Update(deleteIds = ids.toVector)
+        def DeleteById(ids: String*)(implicit arf: ActorRefFactory) = {
+            Update(deleteIds = ids.toVector,
+                options = RequestOptions(actorSystem),
+                updateOptions = UpdateOptions(actorSystem))
         }
 
         def DeleteByQuery(queries: SolrQueryStringBuilder.QueryPart*)(implicit arf: ActorRefFactory) = {
-            Update(deleteQueries = (queries map SolrQueryStringBuilder.render).toVector)
+            Update(deleteQueries = (queries map SolrQueryStringBuilder.render).toVector,
+                options = RequestOptions(actorSystem),
+                updateOptions = UpdateOptions(actorSystem))
         }
 
-        def DeleteByQueryString(queries: String*) = {
-            Update(deleteQueries = queries.toVector)
+        def DeleteByQueryString(queries: String*)(implicit arf: ActorRefFactory) = {
+            Update(deleteQueries = queries.toVector,
+                options = RequestOptions(actorSystem),
+                updateOptions = UpdateOptions(actorSystem))
         }
     }
 
@@ -220,6 +236,10 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         case object Enable extends Action
         @SerialVersionUID(1L)
         case object Disable extends Action
+
+        def apply(action: Option[Ping.Action] = None)(implicit arf: ActorRefFactory): Ping = {
+            apply(action, RequestOptions(actorSystem).copy(method = RequestMethods.GET, requestTimeout = 5.seconds))
+        }
     }
 
     sealed trait RequestMethod
@@ -245,12 +265,50 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class RequestOptions(method: RequestMethod = RequestMethods.POST,
-                              responseType: SolrResponseType = SolrResponseTypes.Binary,
-                              requestTimeout: FiniteDuration = 1.minute)
+    case class RequestOptions(method: RequestMethod,
+                              responseType: SolrResponseType,
+                              requestTimeout: FiniteDuration)
+
+    object RequestOptions extends SettingsCompanion[RequestOptions]("akkasolr.request-defaults") {
+        override def fromSubConfig(c: Config): RequestOptions = {
+            apply(
+                c getString "method" match {
+                    case "GET" ⇒ RequestMethods.GET
+                    case "POST" ⇒ RequestMethods.POST
+                    case m ⇒ throw new IllegalArgumentException(s"Invalid akkasolr.request-defaults.method: $m")
+                },
+                c getString "writer-type" match {
+                    case "XML" ⇒ SolrResponseTypes.XML
+                    case "Binary" ⇒ SolrResponseTypes.Binary
+                    case "Streaming" ⇒ SolrResponseTypes.Streaming
+                    case m ⇒ throw new IllegalArgumentException(s"Invalid akkasolr.request-defaults.writer-type: $m")
+                },
+                c.getDuration("request-timeout", MILLISECONDS).millis.toCoarsest match {
+                    case fd: FiniteDuration ⇒ fd
+                    case o ⇒
+                        throw new IllegalArgumentException(s"Invalid akkasolr.request-defaults.request-timeout: $o")
+                }
+            )
+        }
+    }
 
     @SerialVersionUID(1L)
-    case class UpdateOptions(commit: Boolean = false, commitWithin: Option[FiniteDuration] = None,
-                             overwrite: Boolean = true)
+    case class UpdateOptions(commit: Boolean,
+                             commitWithin: Option[FiniteDuration],
+                             overwrite: Boolean)
 
+    object UpdateOptions extends SettingsCompanion[UpdateOptions]("akkasolr.update-defaults") {
+        override def fromSubConfig(c: Config): UpdateOptions = {
+            import spray.util.pimpConfig
+
+            apply(
+                c getBoolean "commit",
+                c getDuration "commit-within" match {
+                    case fd: FiniteDuration ⇒ Some(fd)
+                    case _ ⇒ None
+                },
+                c getBoolean "overwrite"
+            )
+        }
+    }
 }

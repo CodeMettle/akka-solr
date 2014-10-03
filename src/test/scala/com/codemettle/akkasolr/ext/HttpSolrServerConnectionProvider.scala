@@ -1,7 +1,7 @@
 /*
  * HttpSolrServerConnectionProvider.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -12,14 +12,14 @@ import spray.http.Uri
 
 import com.codemettle.akkasolr.client.SolrServerClientConnection
 
-import akka.actor.Props
+import akka.actor.{ExtendedActorSystem, Props}
 
 /**
  * @author steven
  *
  */
 class HttpSolrServerConnectionProvider extends ConnectionProvider {
-    override def connectionActorProps(uri: Uri): Props = {
+    override def connectionActorProps(uri: Uri, system: ExtendedActorSystem): Props = {
         SolrServerClientConnection props new HttpSolrServer(uri.toString())
     }
 }

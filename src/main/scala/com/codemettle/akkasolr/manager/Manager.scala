@@ -1,7 +1,7 @@
 /*
  * Manager.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -42,7 +42,7 @@ class Manager extends Actor {
             case Some(c) ⇒ c
             case None ⇒
                 val name = connName.replaceAllIn(uri.toString(), "-")
-                val actor = context.actorOf(Solr.Client.connectionProvider connectionActorProps uri, name)
+                val actor = context.actorOf(Solr.Client connectionActorProps uri, name)
                 connections += (uri → actor)
                 actor
         }

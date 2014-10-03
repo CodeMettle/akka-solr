@@ -1,7 +1,7 @@
 /*
  * ConnectionProvider.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 3, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -9,12 +9,12 @@ package com.codemettle.akkasolr.ext
 
 import spray.http.Uri
 
-import akka.actor.{Actor, Props}
+import akka.actor.{ExtendedActorSystem, Actor, Props}
 
 /**
  * @author steven
  *
  */
 trait ConnectionProvider {
-    def connectionActorProps(uri: Uri): Props
+    def connectionActorProps(uri: Uri, system: ExtendedActorSystem): Props
 }

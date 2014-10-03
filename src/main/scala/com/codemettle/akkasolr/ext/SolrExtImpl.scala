@@ -7,6 +7,8 @@
  */
 package com.codemettle.akkasolr.ext
 
+import spray.http.Uri
+
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.Solr.SolrConnection
 import com.codemettle.akkasolr.imperative.ImperativeWrapper
@@ -47,6 +49,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
                 throw new ConfigurationException(s"Could not find/load Connection Provider class [$fqcn]", e)
         }
     }
+
+    def connectionActorProps(uri: Uri) = connectionProvider.connectionActorProps(uri, eas)
 
     /**
      * Request a Solr connection actor. A connection will be created if needed.

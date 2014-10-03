@@ -30,8 +30,11 @@ object RequestLevel extends App {
     val config = system.settings.config.as[Config]("example")
 
     ultimately(system.shutdown()) {
-        val req = Solr.Select(Solr.queryStringBuilder rawQuery config.as[String]("testQuery"))
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+        import spray.util._
 
-        println(Await.result(Solr.Client.manager ? Solr.Request(config.as[String]("solrAddr"), req), Duration.Inf))
+        val req = Solr.Select(rawQuery(config.as[String]("testQuery")))
+
+        println((Solr.Client.manager ? Solr.Request(config.as[String]("solrAddr"), req)).await)
     }
 }

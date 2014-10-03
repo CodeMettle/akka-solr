@@ -22,6 +22,7 @@ object SolrQueryStringBuilder {
         def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render)
 
         def render(implicit arf: ActorRefFactory): String = this match {
+            case Empty ⇒ ""
             case RawQuery(q) ⇒ q
             case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
             case OrQuery(parts) ⇒ parts map (_.render) mkString ("(", " OR ", ")")
@@ -83,7 +84,7 @@ object SolrQueryStringBuilder {
 
     case class Not(qp: QueryPart) extends QueryPart
 
-    case object Empty extends BuilderMethods
+    case object Empty extends QueryPart
 
     private def valueEsc(value: FieldValueType): String = value match {
         case s: String ⇒

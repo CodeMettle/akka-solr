@@ -11,13 +11,13 @@ import java.util.UUID
 
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
+import spray.util._
 
 import com.codemettle.akkasolr.Solr
 
 import akka.actor.ActorSystem
 import akka.pattern._
 import akka.util.Timeout
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.control.Exception.ultimately
 
@@ -32,18 +32,20 @@ object HttpSolrServerExample extends App {
     implicit val timeout = Timeout(15.seconds)
 
     ultimately(system.shutdown()) {
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
         val config = system.settings.config.as[Config]("example")
 
-        val conn = Await.result(Solr.Client.clientFutureTo(config.as[String]("solrAddr")), Duration.Inf)
+        val conn = Solr.Client.clientFutureTo(config.as[String]("solrAddr")).await
 
-        println(Await.result(conn ? Solr.Ping(), Duration.Inf))
+        println((conn ? Solr.Ping()).await)
 
-        println(Await.result(conn ? (Solr.Update AddDocs Map("uuid" → UUID.randomUUID().toString, "messageType" → "DummyType") commit true), Duration.Inf))
+        println((conn ? (Solr.Update AddDocs Map("uuid" → UUID.randomUUID().toString, "messageType" → "DummyType") commit true)).await)
 
-        println(Await.result(conn ? Solr.Select(Solr.queryStringBuilder defaultField() := "DummyType"), Duration.Inf))
+        println((conn ? Solr.Select(defaultField() := "DummyType")).await)
 
-        println(Await.result(conn ? (Solr.Update DeleteByQuery (Solr.queryStringBuilder defaultField() := "DummyType") commit true), Duration.Inf))
+        println((conn ? (Solr.Update DeleteByQuery (defaultField() := "DummyType") commit true)).await)
 
-        println(Await.result(conn ? Solr.Select(Solr.queryStringBuilder defaultField() := "DummyType"), Duration.Inf))
+        println((conn ? Solr.Select(defaultField() := "DummyType")).await)
     }
 }

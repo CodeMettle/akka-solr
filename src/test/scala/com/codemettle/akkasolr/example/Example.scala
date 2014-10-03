@@ -49,7 +49,9 @@ object Example extends App {
         }
 
         private def sendQuery() = {
-            val query = Solr.queryStringBuilder rawQuery config.as[String]("testQuery") queryOptions() rows 10000
+            import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+            val query = rawQuery(config.as[String]("testQuery")) rows 10000
             conn ! Solr.Select(query)
         }
 

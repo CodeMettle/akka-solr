@@ -7,16 +7,15 @@
  */
 package com.codemettle.akkasolr.util
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.ByteArrayInputStream
 
-import com.google.common.io.ByteStreams
 import org.scalatest._
 
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import akka.util.ByteString
 import scala.compat.Platform
-import scala.concurrent.{ExecutionContext, blocking, Future}
+import scala.concurrent.{Future, blocking}
 import scala.util.Random
 
 /**
@@ -27,9 +26,16 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
     def this() = this(ActorSystem("Test"))
 
     def readFully(ais: ActorInputStream) = {
-        val baos = new ByteArrayOutputStream
-        ByteStreams.copy(ais, baos)
-        baos.toByteArray
+        val buf = new Array[Byte](0x1000)
+        val bs = ByteString.newBuilder
+        var read = 0
+        do {
+            read = ais read buf
+            if (read > 0)
+                bs.putBytes(buf, 0, read)
+        } while (read >= 0)
+
+        bs.result().toArray
     }
 
     def randomBytes(len: Int) = {
@@ -70,7 +76,7 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
 
         val ais = newStream
 
-        import ExecutionContext.Implicits.global
+        import scala.concurrent.ExecutionContext.Implicits.global
 
         Future(blocking {
             Thread.sleep(250)

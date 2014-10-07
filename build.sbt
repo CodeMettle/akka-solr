@@ -53,7 +53,6 @@ libraryDependencies ++= Seq(
     Deps.akkaTest,
     Deps.solrj, // explicitly include even though not technically needed
     Deps.jclOverSlf4j,
-    Deps.guava,
     Deps.logback,
     Deps.scalaTest
 ) map (_ % "test")

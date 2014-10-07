@@ -8,7 +8,6 @@
 
 object Versions {
     val akka = "2.3.6"
-    val guava = "18.0"
     val logback = "1.1.2"
     val scalaTest = "2.2.1"
     val slf4j = "1.7.7"

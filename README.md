@@ -159,6 +159,14 @@ val responseF: Future[SolrQueryResponse] = (connectionActor ? req).mapTo[SolrQue
 
 Errors can be raised from Spray (which should be `Http.ConnectionException` errors) or from akka-solr (which should be `Solr.AkkaSolrError`s - `InvalidUrl`, `RequestTimedOut`, etc)
 
+akka-solr provides an `ImperativeWrapper` class that can be wrapped around the client `ActorRef` or requested with:
+
+```scala
+val connF: Future[ImperativeWrapper] = Solr.Client.imperativeClientTo("http://mysolrserver")
+```
+
+The purpose of `ImperativeWrapper` is to provide a vaguely `SolrServer`-ish interface to akka-solr using Akka `ask`s. This can be helpful to transition from SolrJ or other imperative clients. All `ImperativeWrapper` methods return `Future[SolrQueryResponse]`s.
+
 ### Streaming Requests:
 
 akka-solr can use Solr's chunking/streaming mechanism to send query results to an actor as they are received and parsed. The behavior is similar to SolrJ's `SolrServer.queryAndStreamResponse`.
@@ -181,7 +189,7 @@ Testability
 
 We have many unit tests which employ Solr's `EmbeddedSolrServer` to fire up temporary Solr instances that are loaded, queried, updated, and destroyed during testing. I'm sure there's better ways to go about that, but in the interest of maintaining our test setup I've made akka-solr customizable with different connection actors at runtime.
 
-To use a different connection actor, extend the `com.codemettle.akkasolr.ext.ConnectionProvider` trait and configure the `akkasolr.connectionProvider` config to point to your implementation. akka-solr provides an `HttpSolrServerConnectionProvider` in the `"tests"` jar as an example, which uses the akka-solr-provided `SolrServerClientConnection` actor to run queries against a SolrJ `SolrServer`. A simple `ConnectionProvider` can be created in your test code which uses the same actor with an `EmbeddedSolrServer` (example uri: `"solr://embedded?options=that&you=need"`).
+To use a different connection actor, extend the `com.codemettle.akkasolr.ext.ConnectionProvider` trait and configure the `akkasolr.connectionProvider` config to point to your implementation. akka-solr provides an `HttpSolrServerConnectionProvider` in the `"tests"` jar as an example, which uses the akka-solr-provided `SolrServerClientConnection` actor to run queries against a SolrJ `SolrServer`. A simple `ConnectionProvider` can be created in your test code which uses the same `SolrServerClientConnection` actor with an `EmbeddedSolrServer` (example uri: `"solr://embedded?options=that&you=need"`).
 
 Plans
 -----

@@ -61,6 +61,7 @@ libraryDependencies += {
     CrossVersion partialVersion scalaVersion.value match {
         case Some((2, 10)) => Deps.ficus2_10
         case Some((2, 11)) => Deps.ficus2_11
+        case _ => sys.error("Ficus dependency needs updating")
     }
 } % "test"
 

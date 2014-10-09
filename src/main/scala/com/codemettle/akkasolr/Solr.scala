@@ -1,7 +1,7 @@
 /*
  * Solr.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -14,7 +14,7 @@ import spray.http.StatusCode
 import spray.util.SettingsCompanion
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
 import com.codemettle.akkasolr.querybuilder.{SolrQueryBuilder, SolrQueryStringBuilder}
 import com.codemettle.akkasolr.util.Util
 
@@ -40,9 +40,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
      * @param q Solr query string
      * @return a [[com.codemettle.akkasolr.querybuilder.SolrQueryBuilder]]
      */
-    def createQuery(q: String) = SolrQueryBuilder(q)
+    def createQuery(q: String) = SolrQueryBuilder(RawQuery(q))
 
-    def createQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = SolrQueryBuilder(qp.render)
+    def createQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = SolrQueryBuilder(qp)
 
     /* **** messages *****/
 

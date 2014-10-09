@@ -1,7 +1,7 @@
 /*
  * SolrQueryBuilder.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -14,7 +14,7 @@ import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.common.params.SolrParams
 
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.QueryPart
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
 
 import akka.actor.ActorRefFactory
 import scala.collection.JavaConverters._
@@ -39,14 +39,14 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
  * @author steven
  */
 @SerialVersionUID(1L)
-case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
+case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None) {
     /* ** builder shortcuts ***/
 
-    def withQuery(q: String) = copy(query = q)
+    def withQuery(q: String) = copy(query = RawQuery(q))
 
-    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = qp.render)
+    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = qp)
 
     def rows(r: Int) = copy(rowsOpt = Some(r))
 
@@ -117,8 +117,8 @@ case class SolrQueryBuilder(query: String, rowsOpt: Option[Int] = None, startOpt
      * Create a [[SolrParams]] object that can be used for Solr queries
      * @return an [[ImmutableSolrParams]] representing the state of the builder
      */
-    def toParams: ImmutableSolrParams = {
-        val solrQuery = new SolrQuery(query)
+    def toParams(implicit arf: ActorRefFactory): ImmutableSolrParams = {
+        val solrQuery = new SolrQuery(query.render)
 
         rowsOpt foreach (r ⇒ solrQuery setRows r)
         startOpt foreach (s ⇒ solrQuery setStart s)
@@ -148,7 +148,7 @@ object SolrQueryBuilder {
         def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
         def exeTime = Option(params.getTimeAllowed) map (_.intValue())
 
-        SolrQueryBuilder(params.getQuery, rows, start, fields, sorts, facetFields, exeTime)
+        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime)
     }
 
     /*

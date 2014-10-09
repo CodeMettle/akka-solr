@@ -1,7 +1,7 @@
 /*
  * TestSolrQueryStringBuilder.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -127,7 +127,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
             )
         )
 
-        q.query should equal ("(f1:3 AND -f2:x AND ((1 OR 2) OR -f3:4 OR time:[3 TO 5]))")
+        q.render should equal ("(f1:3 AND -f2:x AND ((1 OR 2) OR -f3:4 OR time:[3 TO 5]))")
     }
 
     "Empty" should "be left out of AND and OR queries" in {

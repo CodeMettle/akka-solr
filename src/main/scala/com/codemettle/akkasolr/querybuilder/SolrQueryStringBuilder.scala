@@ -1,7 +1,7 @@
 /*
  * SolrQueryStringBuilder.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -19,7 +19,7 @@ object SolrQueryStringBuilder {
     type FieldValueType = Any
 
     sealed trait QueryPart {
-        def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(render)
+        def queryOptions()(implicit arf: ActorRefFactory) = SolrQueryBuilder(this)
 
         private def andOrRender(parts: Seq[QueryPart], joiner: String)(implicit arf: ActorRefFactory) = {
             val nonEmpty = parts filterNot (_ eq Empty)

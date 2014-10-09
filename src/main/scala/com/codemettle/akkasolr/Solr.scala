@@ -194,9 +194,6 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     sealed trait AkkaSolrError
 
     @SerialVersionUID(1L)
-    case class InvalidUrl(url: String, error: String) extends Exception(error) with NoStackTrace with AkkaSolrError
-
-    @SerialVersionUID(1L)
     case class RequestTimedOut(after: FiniteDuration)
         extends Exception(s"Request timed out after $after") with NoStackTrace with AkkaSolrError
 

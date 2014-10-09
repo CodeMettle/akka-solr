@@ -157,7 +157,7 @@ Connection actor accepts requests and sends back `SolrQueryResponse` objects
 val responseF: Future[SolrQueryResponse] = (connectionActor ? req).mapTo[SolrQueryResponse]
 ```
 
-Errors can be raised from Spray (which should be `Http.ConnectionException` errors) or from akka-solr (which should be `Solr.AkkaSolrError`s - `InvalidUrl`, `RequestTimedOut`, etc)
+Errors can be raised from Spray (which should be `Http.ConnectionException` errors) or from akka-solr (which should be `Solr.AkkaSolrError`s - `ParseError`, `RequestTimedOut`, etc)
 
 akka-solr provides an `ImperativeWrapper` class that can be wrapped around the client `ActorRef` or requested with:
 

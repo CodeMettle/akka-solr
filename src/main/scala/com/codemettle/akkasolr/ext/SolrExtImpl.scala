@@ -73,7 +73,6 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @param requestor Actor to send resulting connection or errors to. Since it is implicit,
      *                  calling this method from inside an actor without specifying `requestor` will use the Actor's
      *                  implicit `self`
-     * @throws com.codemettle.akkasolr.Solr.InvalidUrl [[Solr.InvalidUrl]] if `solrUrl` cannot be handled
      * @return Unit; sends a [[Solr.SolrConnection]] message to `requestor`. A `spray.can.Http.ConnectionException`
      *         wrapped in a [[akka.actor.Status.Failure]] may be raised by Spray and sent to `requestor`.
      */

@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -61,7 +61,13 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         actorSystem.scheduler.scheduleOnce(timeout, self, TimedOut)
     }
 
-    private var inputStream: ActorInputStream = _
+    private var shutdownTimer = Option.empty[Cancellable]
+
+    private var inputStream = Option.empty[ActorInputStream]
+
+    private var chunkingResponse = false
+    private var chunkingDone = false
+    private var sentResponse = false
 
     override def preStart() = {
         super.preStart()
@@ -76,10 +82,44 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         super.postStop()
 
         timer.cancel()
+        shutdownTimer foreach (_.cancel())
+    }
+
+    private def startShutdown() = {
+        if (!chunkingResponse)
+            self ! PoisonPill
+        else {
+            if (chunkingDone)
+                self ! PoisonPill
+            else {
+                import context.dispatcher
+                import scala.concurrent.duration._
+
+                shutdownTimer = Some(actorSystem.scheduler.scheduleOnce(1.second, self, PoisonPill))
+            }
+        }
+    }
+
+    private def checkShutdown() = {
+        if (chunkingDone && sentResponse)
+            self ! PoisonPill
+    }
+
+    private def finishedParsing(result: NamedList[AnyRef]) = {
+        replyTo ! SolrQueryResponse(request, result)
+        sentResponse = true
+        startShutdown()
+    }
+
+    private def chunkingFinished() = {
+        inputStream foreach (_.streamFinished())
+        chunkingDone = true
+        checkShutdown()
     }
 
     private def sendError(err: Throwable) = {
         replyTo ! Status.Failure(err)
+        sentResponse = true
         self ! PoisonPill
     }
 
@@ -218,8 +258,8 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
             case _ ⇒ // we can add more special cases as they arise
                 {
                     if (chunkStart) {
-                        inputStream = new ActorInputStream
-                        Right(inputStream)
+                        inputStream = Some(new ActorInputStream)
+                        Right(inputStream.get)
                     } else resp.entity.data match {
                         case HttpData.Bytes(bytes) ⇒ Right(bytes.iterator.asInputStream)
                         case _ ⇒ Left(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
@@ -240,24 +280,22 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
         case ChunkedResponseStart(resp) ⇒
             log.debug("response started: {}", resp)
+            chunkingResponse = true
             processResponse(chunkStart = true)(resp)
 
         case MessageChunk(data, _) ⇒ data match {
-            case HttpData.Bytes(bytes) ⇒ inputStream enqueueBytes bytes
+            case HttpData.Bytes(bytes) ⇒ inputStream foreach (_ enqueueBytes bytes)
 
             case _ ⇒ sendError(
                 Solr.InvalidResponse(s"Don't know how to handle message chunk type ${data.getClass.getSimpleName}"))
         }
 
-        case _: ChunkedMessageEnd ⇒ inputStream.streamFinished()
+        case _: ChunkedMessageEnd ⇒ chunkingFinished()
 
         case Status.Failure(t) ⇒ sendError(t)
 
-        case Parsed(result) ⇒
-            replyTo ! SolrQueryResponse(request, result)
-            self ! PoisonPill
+        case Parsed(result) ⇒ finishedParsing(result)
 
-        case m ⇒
-            log.warning("Unhandled message: {}", m)
+        case m ⇒ log.warning("Unhandled message: {}", m)
     }
 }

@@ -71,19 +71,20 @@ autoAPIMappings := true
 
 apiMappings ++= {
     val cp: Seq[Attributed[File]] = (fullClasspath in Compile).value
-    def findManagedDependency(organization: String, name: String): File = {
+    def findManagedDependency(moduleId: ModuleID): File = {
         ( for {
             entry <- cp
             module <- entry.get(moduleID.key)
-            if module.organization == organization
-            if module.name.startsWith(name)
+            if module.organization == moduleId.organization
+            if module.name startsWith moduleId.name
             jarFile = entry.data
         } yield jarFile
             ).head
     }
     Map(
-        findManagedDependency("org.scala-lang", "scala-library") -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"),
-        findManagedDependency("com.typesafe.akka", "akka-actor") -> url(s"http://doc.akka.io/api/akka/${Versions.akka}/")
+        findManagedDependency("org.scala-lang" % "scala-library" % scalaVersion.value) -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"),
+        findManagedDependency(Deps.akkaActor) -> url(s"http://doc.akka.io/api/akka/${Versions.akka}/"),
+        findManagedDependency(Deps.solrj) -> url(s"https://lucene.apache.org/solr/${Versions.solr.replace('.', '_')}/solr-solrj/")
     )
 }
 

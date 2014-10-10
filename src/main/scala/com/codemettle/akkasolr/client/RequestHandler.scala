@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Oct 9, 2014
+ * Updated: Oct 10, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -48,11 +48,11 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     extends Actor with ActorLogging {
     class StreamCallback extends StreamingResponseCallback {
         override def streamSolrDocument(doc: SolrDocument): Unit = {
-            replyTo ! AkkaSolrDocument(doc)
+            sendMessage(AkkaSolrDocument(doc))
         }
 
         override def streamDocListInfo(numFound: Long, start: Long, maxScore: jl.Float): Unit = {
-            replyTo ! SolrResultInfo(numFound, start, maxScore)
+            sendMessage(SolrResultInfo(numFound, start, maxScore))
         }
     }
 
@@ -85,6 +85,10 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         shutdownTimer foreach (_.cancel())
     }
 
+    private def sendMessage(m: Any) = {
+        replyTo.tell(m, context.parent)
+    }
+
     private def startShutdown() = {
         if (!chunkingResponse)
             self ! PoisonPill
@@ -106,7 +110,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     }
 
     private def finishedParsing(result: NamedList[AnyRef]) = {
-        replyTo ! SolrQueryResponse(request, result)
+        sendMessage(SolrQueryResponse(request, result))
         sentResponse = true
         startShutdown()
     }
@@ -118,7 +122,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     }
 
     private def sendError(err: Throwable) = {
-        replyTo ! Status.Failure(err)
+        sendMessage(Status.Failure(err))
         sentResponse = true
         self ! PoisonPill
     }
@@ -249,6 +253,20 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         }
 
         resp.status match {
+            case StatusCodes.BadRequest ⇒
+                sendError(Solr.ServerError(resp.status, s"Is the query malformed? Does it have more than ${
+                    Solr.Client.maxBooleanClauses
+                } boolean clauses?"))
+
+            case StatusCodes.Forbidden ⇒
+                sendError(Solr.ServerError(resp.status, "Authentication is currently unsupported"))
+
+            case StatusCodes.ServiceUnavailable ⇒
+                sendError(Solr.ServerError(resp.status, "Solr may be shutting down or overloaded"))
+
+            case StatusCodes.InternalServerError ⇒
+                sendError(Solr.ServerError(resp.status, "Probably a transient error"))
+
             case StatusCodes.RequestEntityTooLarge ⇒
                 sendError(Solr.ServerError(resp.status, "Try sending large queries as POST instead of GET"))
 

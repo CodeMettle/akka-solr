@@ -1,7 +1,7 @@
 /*
  * Solr.scala
  *
- * Updated: Oct 9, 2014
+ * Updated: Oct 10, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -62,15 +62,22 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class SolrConnection(forAddress: String, connection: ActorRef)
 
+    @SerialVersionUID(1L)
+    case class SolrLBConnection(forAddresses: Set[String], connection: ActorRef)
+
     sealed trait SolrOperation {
         def options: RequestOptions
+
+        def withOptions(opts: RequestOptions): SolrOperation
+
+        def withTimeout(fd: FiniteDuration) = withOptions(options.copy(requestTimeout = fd))
     }
 
     @SerialVersionUID(1L)
     case class Select(query: SolrParams, options: RequestOptions) extends SolrOperation {
         def withOptions(opts: RequestOptions) = copy(options = opts)
 
-        def withTimeout(d: FiniteDuration) = copy(options = options.copy(requestTimeout = d))
+        override def withTimeout(d: FiniteDuration) = copy(options = options.copy(requestTimeout = d))
 
         def withRequestMethod(rm: RequestMethod) = copy(options = options.copy(method = rm))
 
@@ -103,10 +110,14 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class Ping(action: Option[Ping.Action], options: RequestOptions) extends SolrOperation {
         def withAction(action: Ping.Action) = copy(action = Some(action))
+
+        override def withOptions(opts: RequestOptions) = copy(options = opts)
     }
 
     @SerialVersionUID(1L)
-    case class Commit(waitForSearcher: Boolean, softCommit: Boolean, options: RequestOptions) extends SolrOperation
+    case class Commit(waitForSearcher: Boolean, softCommit: Boolean, options: RequestOptions) extends SolrOperation {
+        override def withOptions(opts: RequestOptions) = copy(options = opts)
+    }
 
     object Commit {
         def apply(waitForSearcher: Boolean = true, softCommit: Boolean = false)(implicit arf: ActorRefFactory): Commit = {
@@ -115,7 +126,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class Optimize(waitForSearcher: Boolean, maxSegments: Int, options: RequestOptions) extends SolrOperation
+    case class Optimize(waitForSearcher: Boolean, maxSegments: Int, options: RequestOptions) extends SolrOperation {
+        override def withOptions(opts: RequestOptions) = copy(options = opts)
+    }
 
     object Optimize {
         def apply(waitForSearcher: Boolean = true, maxSegments: Int = 1)(implicit arf: ActorRefFactory): Optimize = {
@@ -124,7 +137,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class Rollback(options: RequestOptions) extends SolrOperation
+    case class Rollback(options: RequestOptions) extends SolrOperation {
+        override def withOptions(opts: RequestOptions) = copy(options = opts)
+    }
 
         @SerialVersionUID(1L)
     case class Update(addDocs: Vector[SolrInputDocument] = Vector.empty, deleteIds: Vector[String] = Vector.empty,
@@ -212,6 +227,10 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     case class ServerError(status: StatusCode, msg: String)
         extends Exception(s"$status - $msg") with NoStackTrace with AkkaSolrError
 
+    @SerialVersionUID(1L)
+    case class AllServersDead()
+        extends Exception("No live servers are available to service request") with NoStackTrace with AkkaSolrError
+
     /* **** types *****/
 
     @SerialVersionUID(1L)
@@ -294,6 +313,23 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
                     case _ ⇒ None
                 },
                 c getBoolean "overwrite"
+            )
+        }
+    }
+
+    @SerialVersionUID(1L)
+    case class LBConnectionOptions(aliveCheckInterval: FiniteDuration, nonStandardPingLimit: Int)
+
+    object LBConnectionOptions extends SettingsCompanion[LBConnectionOptions]("akkasolr.load-balanced-connection-defaults") {
+        override def fromSubConfig(c: Config): LBConnectionOptions = {
+            import spray.util.pimpConfig
+
+            apply(
+                c getDuration "alive-check-interval" match {
+                    case fd: FiniteDuration ⇒ fd
+                    case _ ⇒ 1.minute
+                },
+                c getInt "non-standard-ping-limit"
             )
         }
     }

@@ -1,7 +1,7 @@
 /*
  * Util.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 10, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -13,8 +13,6 @@ import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.{SolrInputDocument, SolrInputField}
 import spray.http.{HttpCharsets, Uri}
 
-import com.codemettle.akkasolr.Solr
-
 import akka.util.{ByteString, Helpers}
 import scala.collection.JavaConverters._
 
@@ -23,10 +21,16 @@ import scala.collection.JavaConverters._
  *
  */
 object Util {
+    /**
+     * Creates a normalized Uri
+     * @param solrUrl URL string to normalize
+     * @return [[Uri]] with any trailing '/' dropped
+     */
     def normalize(solrUrl: String) = {
         val u = Uri(solrUrl)
-        if (u.path.reverse.startsWithSlash)
-            u withPath u.path.reverse.tail.reverse
+        val reversePath = u.path.reverse
+        if (reversePath.startsWithSlash)
+            u withPath reversePath.tail.reverse
         else
             u
     }

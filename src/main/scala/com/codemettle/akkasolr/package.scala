@@ -1,7 +1,7 @@
 /*
  * package.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 13, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -57,5 +57,10 @@ package object akkasolr {
     // add this for 2.10 compilation
     implicit class DurationWithCoarsest(val d: Duration) extends AnyVal {
         def toCoarsest = d
+    }
+
+    // add this for 2.10 compilation
+    implicit class OptionWithContains[T](val o: Option[T]) extends AnyVal {
+        def contains(t: T) = o exists (_ == t)
     }
 }

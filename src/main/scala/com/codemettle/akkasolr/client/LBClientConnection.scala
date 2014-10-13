@@ -19,8 +19,7 @@ import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, SolrResultInfo}
 import com.codemettle.akkasolr.util.Util
 
-import akka.actor.{Actor, ActorRef, Props, Status}
-import scala.collection.immutable.ListMap
+import akka.actor._
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -252,7 +251,8 @@ object LBClientConnection {
     }
 }
 
-class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConnectionOptions) extends Actor {
+class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConnectionOptions)
+    extends Actor with ActorLogging {
     import context.dispatcher
 
     val aliveCheckInterval = options.aliveCheckInterval
@@ -322,7 +322,10 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
 
         def addToDeadIfNeeded(conn: ⇒ ConnectionWrapper) = {
             zombieServers find (_.uri == serverUri) match {
-                case None ⇒ zombieServers :+= conn
+                case None ⇒
+                    log debug ("burying {}", conn.uri)
+                    zombieServers :+= conn
+
                 case Some(s) ⇒
                     val newDead = conn
                     // this won't happen unless we enable adding/removing servers and we get a change while a
@@ -344,13 +347,16 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
     }
 
     private def addToAlive(wrapper: ConnectionWrapper) = {
-        if ((aliveServers find (_.uri == wrapper.uri)).isEmpty)
+        if ((aliveServers find (_.uri == wrapper.uri)).isEmpty) {
+            log debug ("{} rose from the dead", wrapper.uri)
+
             aliveServers :+= wrapper.copy(failedPings = 0)
+        }
     }
 
     private def runExtendedRequest(op: Solr.SolrOperation, serverStrs: List[String], numDeadToTry: Int) = {
         // collapse all server urls into unique URIs and (one of) their corresponding URL
-        val urisAndOrigStrs = (ListMap.empty[Uri, String] /: serverStrs) {
+        val urisAndOrigStrs = (Map.empty[Uri, String] /: serverStrs) {
             case (acc, str) ⇒ acc + (Util.normalize(str) → str)
         }
 

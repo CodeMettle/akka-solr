@@ -1,7 +1,7 @@
 /*
  * TestSolrQueryStringBuilder.scala
  *
- * Updated: Oct 9, 2014
+ * Updated: Oct 14, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -164,5 +164,35 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         )
 
         q4.render should equal ("(* OR a:b)")
+    }
+
+    "isAnyOf" should "be empty if no values supplied" in {
+        import SolrQueryStringBuilder.Methods._
+
+        val q = field("blah") isAnyOf (Nil: _*)
+
+        q should equal (Empty)
+    }
+
+    "IsAnyOf" should "render correctly if empty" in {
+        IsAnyOf(Some("blah"), Nil).render should be ('empty)
+    }
+
+    "NOT" should "render correctly if empty" in {
+        import SolrQueryStringBuilder.Methods._
+
+        val qs = List(NOT(Empty), NOT(rawQuery("")), NOT(IsAnyOf(Some("blah"), Nil)), NOT(OR(Nil: _*)), NOT(AND(Nil: _*)), NOT(field("blah") isAnyOf(Nil: _*)))
+
+        qs map (_.render) foreach (_ should equal (""))
+    }
+
+    "isNoneOf" should "render correctly" in {
+        import SolrQueryStringBuilder.Methods._
+
+        (defaultField() isNoneOf (1, 2, 3)).render should equal ("-(1 OR 2 OR 3)")
+
+        (field("x") isNoneOf ("a", "b", "c")).render should equal ("-(x:a OR x:b OR x:c)")
+
+        (field("z") isNoneOf (Nil: _*)).render should be ('empty)
     }
 }

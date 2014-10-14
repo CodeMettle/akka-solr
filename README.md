@@ -213,6 +213,9 @@ License
 Changelog
 ---------
 
+* **0.9.1**
+  * Bug fixes for empty NOT and IsAnyOf query builders
+  * add isNoneOf query builder method
 * **0.9.0**
   * Initial Release
   * Support for major Solr operations in an actor+message passing interface

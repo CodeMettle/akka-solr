@@ -1,7 +1,7 @@
 /*
  * SolrQueryStringBuilder.scala
  *
- * Updated: Oct 3, 2014
+ * Updated: Oct 14, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -31,11 +31,16 @@ object SolrQueryStringBuilder {
                 nonEmpty map (_.render) mkString ("(", joiner, ")")
         }
 
+        private def notRender(notWhat: QueryPart)(implicit arf: ActorRefFactory) = {
+            val notStr = notWhat.render
+            if (notStr.isEmpty) "" else s"-$notStr"
+        }
+
         def render(implicit arf: ActorRefFactory): String = this match {
             case Empty ⇒ ""
             case RawQuery(q) ⇒ q
             case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
-            case Not(q) ⇒ s"-${q.render}"
+            case Not(q) ⇒ notRender(q)
             case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
             case OrQuery(parts) ⇒ andOrRender(parts, " OR ")
             case AndQuery(parts) ⇒ andOrRender(parts, " AND ")
@@ -49,7 +54,9 @@ object SolrQueryStringBuilder {
                     }
                     fieldVals.mkString("(", " OR ", ")")
                 }
-                if (values.size <= Solr.Client.maxBooleanClauses)
+                if (values.isEmpty)
+                    ""
+                else if (values.size <= Solr.Client.maxBooleanClauses)
                     valsToOr(values)
                 else
                     ((values grouped Solr.Client.maxBooleanClauses) map valsToOr).mkString("(", " OR ", ")")
@@ -59,7 +66,8 @@ object SolrQueryStringBuilder {
     case class FieldBuilder(field: Option[String]) {
         def :=(v: FieldValueType) = FieldValue(field, v)
         def :!=(v: FieldValueType) = Not(FieldValue(field, v))
-        def isAnyOf(vs: FieldValueType*) = IsAnyOf(field, vs)
+        def isAnyOf(vs: FieldValueType*) = if (vs.nonEmpty) IsAnyOf(field, vs) else Empty
+        def isNoneOf(vs: FieldValueType*) = if (vs.nonEmpty) Not(isAnyOf(vs: _*)) else Empty
         def isInRange(lower: FieldValueType, upper: FieldValueType) = Range(field, lower, upper)
         def exists() = isInRange("*", "*")
         def doesNotExist() = Not(Range(field, "*", "*"))

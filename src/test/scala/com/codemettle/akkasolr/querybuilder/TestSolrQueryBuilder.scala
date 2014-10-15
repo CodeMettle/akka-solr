@@ -51,7 +51,6 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.addSort("f1", SolrQuery.ORDER.asc)
         sq.addFacetField("f1")
         sq.setTimeAllowed(60000)
-        sq.set("collection", "mycoll")
 
         checkEquals(sq, ImmutableSolrParams(sq))
     }
@@ -66,8 +65,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
     it should "add supported fields" in {
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
-            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
-            "testing" withCollection "mycoll"
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix "testing"
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -80,7 +78,6 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetLimit(10)
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
-        sq.set("collection", "mycoll")
 
         checkEquals(sq, sqc)
     }
@@ -137,16 +134,6 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqc10 = sqc9 allowedExecutionTime Duration.Undefined
 
         checkEquals(sq, sqc10)
-
-        sq.set("collection", "mycoll")
-        val sqc11 = sqc10 withCollection "mycoll"
-
-        checkEquals(sq, sqc11)
-
-        sq.remove("collection")
-        val sqc12 = sqc11 withoutCollection()
-
-        checkEquals(sq, sqc12)
     }
 
     it should "be creatable from a SolrQuery" in {
@@ -161,7 +148,6 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb1.sortsList should be ('empty)
         sqb1.facetFields should be ('empty)
         sqb1.serverTimeAllowed should be ('empty)
-        sqb1.collection should be ('empty)
 
         q setRows 10
 
@@ -198,19 +184,12 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
         val sqb7 = SolrQueryBuilder.fromSolrQuery(q)
 
+        sqb7.query should equal (RawQuery("*"))
+        sqb7.rowsOpt.value should equal (10)
+        sqb7.fieldList should equal (Vector("a", "b"))
+        sqb7.startOpt.value should equal (25)
+        sqb7.sortsList should equal (Vector("a".ascending, "b".descending))
+        sqb7.facetFields should equal (Vector("a", "b"))
         sqb7.serverTimeAllowed.value should equal (5000)
-
-        q.set("collection", "mycoll")
-
-        val sqb8 = SolrQueryBuilder.fromSolrQuery(q)
-
-        sqb8.query should equal (RawQuery("*"))
-        sqb8.rowsOpt.value should equal (10)
-        sqb8.fieldList should equal (Vector("a", "b"))
-        sqb8.startOpt.value should equal (25)
-        sqb8.sortsList should equal (Vector("a".ascending, "b".descending))
-        sqb8.facetFields should equal (Vector("a", "b"))
-        sqb8.serverTimeAllowed.value should equal (5000)
-        sqb8.collection.value should equal ("mycoll")
     }
 }

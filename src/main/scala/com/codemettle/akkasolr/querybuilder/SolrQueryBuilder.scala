@@ -1,7 +1,7 @@
 /*
  * SolrQueryBuilder.scala
  *
- * Updated: Oct 13, 2014
+ * Updated: Oct 9, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -43,8 +43,8 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None,
-                            collection: Option[String] = None, facetLimit: Option[Int] = None,
-                            facetMinCount: Option[Int] = None, facetPrefix: Option[String] = None) {
+                            facetLimit: Option[Int] = None, facetMinCount: Option[Int] = None,
+                            facetPrefix: Option[String] = None) {
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -126,10 +126,6 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutAllowedExecutionTime() = copy(serverTimeAllowed = None)
 
-    def withCollection(coll: String) = if (collection contains coll) this else copy(collection = Some(coll))
-
-    def withoutCollection() = if (collection.isEmpty) this else copy(collection = None)
-
     /*** solrquery creation ***/
 
     /**
@@ -149,7 +145,6 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         facetLimit foreach (l ⇒ solrQuery.setFacetLimit(l))
         facetMinCount foreach (m ⇒ solrQuery.setFacetMinCount(m))
         facetPrefix foreach (p ⇒ solrQuery.setFacetPrefix(p))
-        collection foreach (c ⇒ solrQuery.set("collection", c))
 
         ImmutableSolrParams(solrQuery)
     }
@@ -170,9 +165,8 @@ object SolrQueryBuilder {
         def sorts = params.getSorts.asScala.toVector
         def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
         def exeTime = Option(params.getTimeAllowed) map (_.intValue())
-        def coll = Option(params get "collection")
 
-        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, coll)
+        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime)
     }
 
     /*

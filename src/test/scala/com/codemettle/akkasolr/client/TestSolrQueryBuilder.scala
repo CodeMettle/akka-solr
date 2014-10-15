@@ -61,7 +61,7 @@ class TestSolrQueryBuilder extends FlatSpec with Matchers {
 
     it should "add supported fields" in {
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
-            "f1" allowedExecutionTime 60000
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix "testing"
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -71,6 +71,9 @@ class TestSolrQueryBuilder extends FlatSpec with Matchers {
         sq.addSort("f1", SolrQuery.ORDER.asc)
         sq.addFacetField("f1")
         sq.setTimeAllowed(60000)
+        sq.setFacetLimit(10)
+        sq.setFacetMinCount(1)
+        sq.setFacetPrefix("testing")
 
         checkEquals(sq, sqc)
     }

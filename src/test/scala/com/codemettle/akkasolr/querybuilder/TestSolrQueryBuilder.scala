@@ -29,6 +29,9 @@ class TestSolrQueryBuilder extends FlatSpec with Matchers with OptionValues {
         sqb1.sortsList should be ('empty)
         sqb1.facetFields should be ('empty)
         sqb1.serverTimeAllowed should be ('empty)
+        sqb1.facetLimit should be ('empty)
+        sqb1.facetMinCount should be ('empty)
+        sqb1.facetPrefix should be ('empty)
 
         q setRows 10
 
@@ -62,6 +65,9 @@ class TestSolrQueryBuilder extends FlatSpec with Matchers with OptionValues {
         sqb6.facetFields should equal (Vector("a", "b"))
 
         q.setTimeAllowed(5000)
+        q.setFacetLimit(42)
+        q.setFacetMinCount(12)
+        q.setFacetPrefix("fp")
 
         val sqb7 = SolrQueryBuilder.fromSolrQuery(q)
 
@@ -72,5 +78,8 @@ class TestSolrQueryBuilder extends FlatSpec with Matchers with OptionValues {
         sqb7.sortsList should equal (Vector("a".ascending, "b".descending))
         sqb7.facetFields should equal (Vector("a", "b"))
         sqb7.serverTimeAllowed.value should equal (5000)
+        sqb7.facetLimit.value should equal (42)
+        sqb7.facetMinCount.value should equal (12)
+        sqb7.facetPrefix.value should equal ("fp")
     }
 }

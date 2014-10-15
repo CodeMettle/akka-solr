@@ -66,7 +66,8 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
     it should "add supported fields" in {
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
-            "f1" allowedExecutionTime 60000 withCollection "mycoll"
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
+            "testing" withCollection "mycoll"
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -76,6 +77,9 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.addSort("f1", SolrQuery.ORDER.asc)
         sq.addFacetField("f1")
         sq.setTimeAllowed(60000)
+        sq.setFacetLimit(10)
+        sq.setFacetMinCount(1)
+        sq.setFacetPrefix("testing")
         sq.set("collection", "mycoll")
 
         checkEquals(sq, sqc)

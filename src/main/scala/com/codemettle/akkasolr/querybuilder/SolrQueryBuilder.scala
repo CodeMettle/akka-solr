@@ -43,7 +43,8 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None,
-                            collection: Option[String] = None) {
+                            collection: Option[String] = None, facetLimit: Option[Int] = None,
+                            facetMinCount: Option[Int] = None, facetPrefix: Option[String] = None) {
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -99,6 +100,18 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutFacetFields() = if (facetFields.isEmpty) this else copy(facetFields = Vector.empty)
 
+    def withFacetLimit(limit: Int) = if (facetLimit contains limit) this else copy(facetLimit = Some(limit))
+
+    def withoutFacetLimit() = if (facetLimit.isEmpty) this else copy(facetLimit = None)
+
+    def withFacetMinCount(min: Int) = if (facetMinCount contains min) this else copy(facetMinCount = Some(min))
+
+    def withoutFacetMinCount() = if (facetMinCount.isEmpty) this else copy(facetMinCount = None)
+
+    def withFacetPrefix(prefix: String) = if (facetPrefix contains prefix) this else copy(facetPrefix = Some(prefix))
+
+    def withoutFacetPrefix() = if (facetPrefix.isEmpty) this else copy(facetPrefix = None)
+
     def allowedExecutionTime(millis: Int) = copy(serverTimeAllowed = Some(millis))
 
     def allowedExecutionTime(duration: FiniteDuration) = duration.toMillis match {
@@ -133,6 +146,9 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         if (facetFields.nonEmpty)
             solrQuery addFacetField (facetFields.toSeq: _*)
         serverTimeAllowed foreach (ms ⇒ solrQuery setTimeAllowed ms)
+        facetLimit foreach (l ⇒ solrQuery.setFacetLimit(l))
+        facetMinCount foreach (m ⇒ solrQuery.setFacetMinCount(m))
+        facetPrefix foreach (p ⇒ solrQuery.setFacetPrefix(p))
         collection foreach (c ⇒ solrQuery.set("collection", c))
 
         ImmutableSolrParams(solrQuery)

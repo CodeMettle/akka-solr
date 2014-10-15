@@ -12,7 +12,7 @@ import java.{util => ju}
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
-import org.apache.solr.common.params.SolrParams
+import org.apache.solr.common.params.{FacetParams, SolrParams}
 
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
@@ -165,8 +165,12 @@ object SolrQueryBuilder {
         def sorts = params.getSorts.asScala.toVector
         def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
         def exeTime = Option(params.getTimeAllowed) map (_.intValue())
+        def facetLimit = Option(params.get(FacetParams.FACET_LIMIT)) map (_.toInt)
+        def facetMinCount = Option(params.get(FacetParams.FACET_MINCOUNT)) map (_.toInt)
+        def facetPrefix = Option(params.get(FacetParams.FACET_PREFIX))
 
-        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime)
+        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, facetLimit,
+            facetMinCount, facetPrefix)
     }
 
     /*

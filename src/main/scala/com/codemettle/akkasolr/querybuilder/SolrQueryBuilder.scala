@@ -5,7 +5,8 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
-package com.codemettle.akkasolr.querybuilder
+package com.codemettle.akkasolr
+package querybuilder
 
 import java.{util => ju}
 

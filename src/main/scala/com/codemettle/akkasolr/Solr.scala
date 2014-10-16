@@ -1,20 +1,24 @@
 /*
  * Solr.scala
  *
- * Updated: Oct 10, 2014
+ * Updated: Oct 14, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
 package com.codemettle.akkasolr
 
+import java.{lang => jl, util => ju}
+
 import com.typesafe.config.Config
+import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION
+import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.SolrInputDocument
-import org.apache.solr.common.params.SolrParams
+import org.apache.solr.common.params.{SolrParams, UpdateParams}
 import spray.http.StatusCode
 import spray.util.SettingsCompanion
 
 import com.codemettle.akkasolr.ext.SolrExtImpl
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{QueryPart, RawQuery}
 import com.codemettle.akkasolr.querybuilder.{SolrQueryBuilder, SolrQueryStringBuilder}
 import com.codemettle.akkasolr.util.Util
 
@@ -73,6 +77,21 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def withTimeout(fd: FiniteDuration) = withOptions(options.copy(requestTimeout = fd))
     }
 
+    sealed trait SolrUpdateOperation extends SolrOperation {
+        def solrJUpdateRequest: UpdateRequest
+    }
+
+    object SolrUpdateOperation {
+        private[akkasolr] def apply(ur: UpdateRequest)(implicit arf: ActorRefFactory): SolrUpdateOperation = {
+            if (Option(ur.getParams).fold(false)(_.getBool(UpdateParams.ROLLBACK, false)))
+                Rollback(ur)
+            else if (ur.getAction == ACTION.OPTIMIZE)
+                Optimize(ur)
+            else
+                Update(ur)
+        }
+    }
+
     @SerialVersionUID(1L)
     case class Select(query: SolrParams, options: RequestOptions) extends SolrOperation {
         def withOptions(opts: RequestOptions) = copy(options = opts)
@@ -115,8 +134,14 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class Commit(waitForSearcher: Boolean, softCommit: Boolean, options: RequestOptions) extends SolrOperation {
+    case class Commit(waitForSearcher: Boolean, softCommit: Boolean, options: RequestOptions) extends SolrUpdateOperation {
         override def withOptions(opts: RequestOptions) = copy(options = opts)
+
+        override def solrJUpdateRequest: UpdateRequest = {
+            val ur = new UpdateRequest()
+            ur.setAction(ACTION.COMMIT, true, waitForSearcher, softCommit)
+            ur
+        }
     }
 
     object Commit {
@@ -126,25 +151,59 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     @SerialVersionUID(1L)
-    case class Optimize(waitForSearcher: Boolean, maxSegments: Int, options: RequestOptions) extends SolrOperation {
+    case class Optimize(waitForSearcher: Boolean, maxSegments: Int, options: RequestOptions) extends SolrUpdateOperation {
         override def withOptions(opts: RequestOptions) = copy(options = opts)
+
+        override def solrJUpdateRequest: UpdateRequest = {
+            val ur = new UpdateRequest()
+            ur.setAction(ACTION.OPTIMIZE, true, waitForSearcher, maxSegments)
+            ur
+        }
     }
 
     object Optimize {
         def apply(waitForSearcher: Boolean = true, maxSegments: Int = 1)(implicit arf: ActorRefFactory): Optimize = {
             apply(waitForSearcher, maxSegments, RequestOptions(actorSystem))
         }
+
+        private[akkasolr] def apply(ur: UpdateRequest)(implicit arf: ActorRefFactory): Optimize = {
+            if (ur.getAction != ACTION.OPTIMIZE)
+                throw Solr.InvalidRequest("Request isn't an optimize request")
+
+            apply(
+                ur.getParams.getBool(UpdateParams.WAIT_SEARCHER, true),
+                ur.getParams.getInt(UpdateParams.MAX_OPTIMIZE_SEGMENTS, 1),
+                RequestOptions(actorSystem)
+            )
+        }
     }
 
     @SerialVersionUID(1L)
-    case class Rollback(options: RequestOptions) extends SolrOperation {
+    case class Rollback(options: RequestOptions) extends SolrUpdateOperation {
         override def withOptions(opts: RequestOptions) = copy(options = opts)
+
+        override def solrJUpdateRequest: UpdateRequest = {
+            val ur = new UpdateRequest()
+            ur.rollback()
+            ur
+        }
     }
 
-        @SerialVersionUID(1L)
+    object Rollback {
+        def apply()(implicit arf: ActorRefFactory): Rollback = Rollback(RequestOptions(actorSystem))
+
+        private[akkasolr] def apply(ur: UpdateRequest)(implicit arf: ActorRefFactory): Rollback = {
+            if (!Option(ur.getParams).fold(false)(_.getBool(UpdateParams.ROLLBACK, false)))
+                throw Solr.InvalidRequest("Request isn't a rollback request")
+
+            apply(RequestOptions(actorSystem))
+        }
+    }
+
+    @SerialVersionUID(1L)
     case class Update(addDocs: Vector[SolrInputDocument] = Vector.empty, deleteIds: Vector[String] = Vector.empty,
                       deleteQueries: Vector[String] = Vector.empty, updateOptions: UpdateOptions,
-                      options: RequestOptions) extends SolrOperation {
+                      options: RequestOptions) extends SolrUpdateOperation {
         def addDoc(doc: Map[String, AnyRef]) = copy(addDocs = addDocs ++ Util.createSolrInputDocs(doc))
 
         def addDoc(doc: SolrInputDocument) = copy(addDocs = addDocs :+ doc)
@@ -170,6 +229,33 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def withOptions(opts: RequestOptions) = copy(options = opts)
 
         def withUpdateOptions(opts: UpdateOptions) = copy(updateOptions = opts)
+
+        def basicUpdateRequest: UpdateRequest = {
+            import scala.collection.JavaConverters._
+
+            val ur = new UpdateRequest
+            updateOptions.commitWithin match {
+                case None ⇒ addDocs foreach (ur.add(_, updateOptions.overwrite))
+                case Some(cw) ⇒
+                    val cwMillis = math.min(Int.MaxValue, cw.toMillis).toInt
+                    ur.setCommitWithin(cwMillis)
+                    addDocs foreach (ur.add(_, cwMillis, updateOptions.overwrite))
+            }
+            if (deleteIds.nonEmpty)
+                ur.deleteById(deleteIds.asJava)
+            if (deleteQueries.nonEmpty)
+                ur.setDeleteQuery(deleteQueries.asJava)
+            ur
+        }
+
+        override def solrJUpdateRequest: UpdateRequest = {
+            if (updateOptions.commit) {
+                val ur = basicUpdateRequest
+                ur.setAction(ACTION.COMMIT, true, true)
+                ur
+            } else
+                basicUpdateRequest
+        }
     }
 
     object Update {
@@ -201,6 +287,68 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             Update(deleteQueries = queries.toVector,
                 options = RequestOptions(actorSystem),
                 updateOptions = UpdateOptions(actorSystem))
+        }
+
+        /**
+         * Not really meant for full-fledged conversion, just a way to convert an UpdateRequest that was created by akka-solr
+         */
+        private[akkasolr] def apply(ur: UpdateRequest)(implicit arf: ActorRefFactory): Update = {
+            import scala.collection.JavaConverters._
+
+            if (ur.getAction == ACTION.OPTIMIZE)
+                throw Solr.InvalidRequest("Solr.Update doesn't currently support optimizing; use Solr.Optimize")
+
+            if (Option(ur.getParams).fold(false)(_.getBool(UpdateParams.ROLLBACK, false)))
+                throw Solr.InvalidRequest("Solr.Update doesn't currently support rollback; use Solr.Rollback")
+
+            def overwriteDisabled = {
+                Option(ur.getDocumentsMap).fold(false)(_.values().asScala forall {
+                    case null ⇒ false
+                    case docOpts ⇒ docOpts.asScala get UpdateRequest.OVERWRITE match {
+                        case None ⇒ false
+                        case Some(ow: jl.Boolean) ⇒ !ow
+                        case _ ⇒ false
+                    }
+                })
+            }
+
+            def commitWithinFromDocs = {
+                def commitWithinFromDocProps(props: ju.Map[String, AnyRef]) = {
+                    Option(props) flatMap (_.asScala get UpdateRequest.COMMIT_WITHIN match {
+                        case None ⇒ None
+                        case Some(cw: jl.Integer) ⇒ Some(cw.intValue().millis)
+                        case _ ⇒ None
+                    })
+                }
+
+                def uniqueCommitWithinsFromDocuments(docs: ju.Map[SolrInputDocument, ju.Map[String, AnyRef]]) = {
+                    (docs.values().asScala map commitWithinFromDocProps).toSet
+                }
+
+                val commitWithinOpts = Option(ur.getDocumentsMap)
+                    .fold(Set.empty[Option[FiniteDuration]])(uniqueCommitWithinsFromDocuments)
+                val commitWithins = commitWithinOpts.flatten
+
+                // if both have 1 unique entry which is a Some(<duration>)/<duration>, that means every document
+                // had a commitwithin and they were all the same
+                if (commitWithinOpts.size == 1 && commitWithins.size == 1) commitWithins.headOption else None
+            }
+
+            val commitWithin = {
+                if (ur.getCommitWithin > 0)
+                    Some(ur.getCommitWithin.millis)
+                else
+                    commitWithinFromDocs
+            }
+
+            val commit = ur.getAction == ACTION.COMMIT
+
+            val docsToAdd = Option(ur.getDocuments).fold(Vector.empty[SolrInputDocument])(_.asScala.toVector)
+            val idsToDelete = Option(ur.getDeleteById).fold(Vector.empty[String])(_.asScala.toVector)
+            val deleteQueries = Option(ur.getDeleteQuery).fold(Vector.empty[String])(_.asScala.toVector)
+
+            Update(docsToAdd, idsToDelete, deleteQueries, UpdateOptions(commit, commitWithin, !overwriteDisabled),
+                RequestOptions(actorSystem))
         }
     }
 

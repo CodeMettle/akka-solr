@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Oct 10, 2014
+ * Updated: Oct 14, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -10,9 +10,8 @@ package client
 
 import java.io.InputStream
 import java.{lang => jl}
-import scala.collection.JavaConverters._
+
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, StreamingBinaryResponseParser, XMLResponseParser}
-import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.params.{CommonParams, UpdateParams}
@@ -22,7 +21,7 @@ import spray.http._
 import com.codemettle.akkasolr.Solr.{RequestMethods, SolrOperation, SolrResponseTypes}
 import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
 import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, SolrResultInfo}
-import com.codemettle.akkasolr.util.{Util, ActorInputStream}
+import com.codemettle.akkasolr.util.{ActorInputStream, Util}
 
 import akka.actor._
 import akka.pattern._
@@ -185,13 +184,8 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
     private def createHttpRequest = {
         request match {
-            case Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) ⇒
-                val ur = new UpdateRequest
-                addDocs foreach (ur.add(_, opts.overwrite))
-                if (deleteIds.nonEmpty)
-                    ur.deleteById(deleteIds.asJava)
-                if (deleteQueries.nonEmpty)
-                    ur.setDeleteQuery(deleteQueries.asJava)
+            case su@Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) ⇒
+                val request = su.basicUpdateRequest
 
                 val query = {
                     if (opts.commit)
@@ -204,7 +198,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
 
                 HttpRequest(HttpMethods.POST, baseUri.updateUri withQuery query,
                     entity = HttpEntity(ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`),
-                        Util updateRequestToByteString ur))
+                        Util updateRequestToByteString request))
 
             case _ ⇒ createQueryRequest
         }

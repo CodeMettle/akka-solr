@@ -1,14 +1,13 @@
 /*
  * ClientConnection.scala
  *
- * Updated: Sep 26, 2014
+ * Updated: Oct 16, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
 package com.codemettle.akkasolr
 package client
 
-import org.apache.solr.client.solrj.response.QueryResponse
 import spray.can.Http
 import spray.can.client.{ClientConnectionSettings, HostConnectorSettings}
 import spray.can.parsing.ParserSettings
@@ -85,13 +84,14 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             stay()
 
         case Event(req: SolrOperation, _) ⇒
-            stasher ! ConnectingStasher.WaitingRequest(sender(), req, req.options.requestTimeout)
+            val to = req.options.requestTimeout
+            stasher ! ConnectingStasher.WaitingRequest(sender(), req, to, to)
             stay()
 
-        case Event(ConnectingStasher.StashedRequest(act, req, remainingTimeout), _) ⇒
+        case Event(ConnectingStasher.StashedRequest(act, req, remainingTimeout, origTimeout), _) ⇒
             // if we get this message, it means that we successfully connected, asked for stashed connections, and
             // then got disconnected before processing them all
-            stasher ! ConnectingStasher.WaitingRequest(act, req, remainingTimeout)
+            stasher ! ConnectingStasher.WaitingRequest(act, req, remainingTimeout, origTimeout)
             stay()
 
         case Event(m, _) ⇒
@@ -112,7 +112,9 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             IO(Http)(actorSystem) ! Http.HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort,
                 baseUri.isSsl, settings = Some(hostConnSettings))
 
-            stasher ! ConnectingStasher.WaitingRequest(sender(), m, m.options.requestTimeout)
+            val to = m.options.requestTimeout
+
+            stasher ! ConnectingStasher.WaitingRequest(sender(), m, to, to)
 
             goto(fsm.Connecting) using fsm.CCData()
     }
@@ -161,7 +163,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             serviceRequest(data.hostConn, m, sender(), m.options.requestTimeout)
             stay()
 
-        case Event(ConnectingStasher.StashedRequest(act, req, remaining), data) ⇒
+        case Event(ConnectingStasher.StashedRequest(act, req: Solr.SolrOperation, remaining, _), data) ⇒
             serviceRequest(data.hostConn, req, act, remaining)
             stay()
     }

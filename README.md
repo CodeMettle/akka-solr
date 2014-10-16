@@ -213,6 +213,8 @@ License
 Changelog
 ---------
 
+* **0.9.2**
+  * Add support in SolrQueryBuilder for facetLimit, facetMinCount, and facetPrefix
 * **0.9.1**
   * Bug fixes for empty NOT and IsAnyOf query builders
   * add isNoneOf query builder method

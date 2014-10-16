@@ -7,16 +7,16 @@
  */
 package com.codemettle.akkasolr.querybuilder
 
-import akka.actor.ActorSystem
-import akka.testkit.TestKit
-import com.codemettle.akkasolr.Solr
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.RawQuery
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.common.params.SolrParams
 import org.scalatest._
 
+import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.{ImmutableSolrParams, FieldStrToSort}
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.RawQuery
 
+import akka.actor.ActorSystem
+import akka.testkit.TestKit
 import scala.concurrent.duration.Duration
 
 /**

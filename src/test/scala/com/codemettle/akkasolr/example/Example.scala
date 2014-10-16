@@ -9,7 +9,6 @@ package com.codemettle.akkasolr.example
 
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
-import org.apache.solr.client.solrj.SolrQuery
 
 import com.codemettle.akkasolr.Solr
 

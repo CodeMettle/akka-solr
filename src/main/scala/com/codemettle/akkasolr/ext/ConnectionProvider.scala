@@ -9,7 +9,7 @@ package com.codemettle.akkasolr.ext
 
 import spray.http.Uri
 
-import akka.actor.{ExtendedActorSystem, Actor, Props}
+import akka.actor.{ExtendedActorSystem, Props}
 
 /**
  * @author steven

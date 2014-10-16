@@ -11,7 +11,7 @@ import spray.http.Uri
 
 import com.codemettle.akkasolr.client.ClientConnection
 
-import akka.actor.{Props, ExtendedActorSystem}
+import akka.actor.ExtendedActorSystem
 
 /**
  * @author steven

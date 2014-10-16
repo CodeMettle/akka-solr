@@ -10,15 +10,15 @@ package client
 
 import org.apache.solr.client.solrj.SolrServer
 import org.apache.solr.client.solrj.request.{UpdateRequest, SolrPing}
-import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.util.NamedList
-import scala.collection.JavaConverters._
+
 import com.codemettle.akkasolr.client.SolrServerClientConnection.ReqHandler
 import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
 import akka.pattern._
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
 /**

@@ -10,7 +10,6 @@ package com.codemettle.akkasolr.querybuilder
 import com.typesafe.config.ConfigFactory
 import org.scalatest._
 
-import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder._
 
 import akka.actor.ActorSystem
@@ -131,7 +130,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "Empty" should "be left out of AND and OR queries" in {
-        import SolrQueryStringBuilder.Methods._
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         val q = AND (
             Empty,
@@ -167,7 +166,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "isAnyOf" should "be empty if no values supplied" in {
-        import SolrQueryStringBuilder.Methods._
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         val q = field("blah") isAnyOf (Nil: _*)
 
@@ -179,7 +178,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "NOT" should "render correctly if empty" in {
-        import SolrQueryStringBuilder.Methods._
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         val qs = List(NOT(Empty), NOT(rawQuery("")), NOT(IsAnyOf(Some("blah"), Nil)), NOT(OR(Nil: _*)), NOT(AND(Nil: _*)), NOT(field("blah") isAnyOf(Nil: _*)))
 
@@ -187,7 +186,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "isNoneOf" should "render correctly" in {
-        import SolrQueryStringBuilder.Methods._
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         (defaultField() isNoneOf (1, 2, 3)).render should equal ("-(1 OR 2 OR 3)")
 

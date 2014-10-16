@@ -15,7 +15,6 @@ import com.codemettle.akkasolr.Solr
 import akka.actor.ActorSystem
 import akka.pattern._
 import akka.util.Timeout
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.control.Exception.ultimately
 

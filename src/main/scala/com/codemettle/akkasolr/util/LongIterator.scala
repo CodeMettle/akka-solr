@@ -7,7 +7,7 @@
  */
 package com.codemettle.akkasolr.util
 
-import scala.collection.{AbstractIterator, Iterator}
+import scala.collection.Iterator
 
 /**
  * Copied from scala's Iterator

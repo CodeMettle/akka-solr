@@ -8,7 +8,6 @@
 package com.codemettle.akkasolr.solrtypes
 
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.common.util.NamedList
 
 import com.codemettle.akkasolr.Solr
 

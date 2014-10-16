@@ -11,11 +11,12 @@ import org.apache.solr.common.cloud.ZkStateReader
 
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.client.SolrCloudConnection.{Connect, OperateOnCollection, fsm}
-import com.codemettle.akkasolr.client.zk.ZkUtil
+import com.codemettle.akkasolr.client.zk.{ZkRequestHandler, ZkUtil}
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
 import akka.pattern._
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Try}
 
 /**
@@ -67,10 +68,21 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
         }
     }
 
+    private def serviceRequest(zkStateReader: ZkStateReader, req: Solr.SolrOperation, collection: Option[String],
+                               timeout: FiniteDuration, origTimeout: FiniteDuration) = {
+        val name = actorName.next()
+        val props = ZkRequestHandler
+            .props(lbServer, zkStateReader, zkUtil, req, collection, sender(), timeout, origTimeout)
+
+        context.actorOf(props, name)
+
+        stay()
+    }
+
     private def stash(op: Any, replyTo: ActorRef) = {
         val timeout = op match {
-            case OperateOnCollection(so, _) ⇒ so.options.requestTimeout
-            case so: Solr.SolrOperation ⇒ so.options.requestTimeout
+            case OperateOnCollection(so, _) ⇒ so.requestTimeout
+            case so: Solr.SolrOperation ⇒ so.requestTimeout
         }
 
         stasher ! ConnectingStasher.WaitingRequest(replyTo, op, timeout, timeout)
@@ -106,9 +118,17 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
     }
 
     when(fsm.Connected) {
-        case Event(ConnectingStasher.StashedRequest(replyTo, req, timeout, origTimeout), fsm.Data(reader)) ⇒ ???
-        case Event(OperateOnCollection(op, collection), fsm.Data(reader)) ⇒ ???
-        case Event(op: Solr.SolrOperation, fsm.Data(reader)) ⇒ ???
+        case Event(ConnectingStasher.StashedRequest(replyTo, req: Solr.SolrOperation, timeout, origTimeout), fsm.Data(reader)) ⇒
+            serviceRequest(reader, req, None, timeout, origTimeout)
+
+        case Event(ConnectingStasher.StashedRequest(replyTo, OperateOnCollection(req, collection), timeout, origTimeout), fsm.Data(reader)) ⇒
+            serviceRequest(reader, req, Some(collection), timeout, origTimeout)
+
+        case Event(OperateOnCollection(op, collection), fsm.Data(reader)) ⇒
+            serviceRequest(reader, op, Some(collection), op.requestTimeout, op.requestTimeout)
+
+        case Event(op: Solr.SolrOperation, fsm.Data(reader)) ⇒
+            serviceRequest(reader, op, None, op.requestTimeout, op.requestTimeout)
     }
 
     initialize()

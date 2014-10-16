@@ -1,7 +1,7 @@
 /*
- * ZkStateReaderWrapper.scala
+ * ZkUtil.scala
  *
- * Updated: Oct 13, 2014
+ * Updated: Oct 16, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -31,7 +31,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
 /**
- * Class to wrap blocking SolrJ ZkStateReader methods in Futures using the configured ZooKeeper dispatcher.
+ * Translates ZooKeeper-specific code from [[org.apache.solr.client.solrj.impl.CloudSolrServer]]
  *
  * @author steven
  *
@@ -48,8 +48,8 @@ object ZkUtil {
     private[zk] case class DirectUpdateInfo(updateRequest: UpdateRequest, allParams: ImmutableSolrParams,
                                             routes: Map[String, LBClientConnection.ExtendedRequest])
 
-    private def condenseResponses(shardResponses: Map[String, NamedList[AnyRef]], timeMillis: Long,
-                                  routes: Map[String, LBClientConnection.ExtendedRequest]) = {
+    def condenseResponses(shardResponses: Map[String, NamedList[AnyRef]], timeMillis: Long,
+                          routes: Map[String, LBClientConnection.ExtendedRequest]) = {
         def getStatusFromResp(shardResponse: NamedList[AnyRef]) = {
             def getStatusFromHeader(header: NamedList[_]) = {
                 header get "status" match {
@@ -276,13 +276,40 @@ case class ZkUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: ActorRe
         ???
     }
 
-    def directUpdateRoutes(zkStateReader: ZkStateReader, op: Solr.SolrUpdateOperation, clusterState: ClusterState, collection: Option[String]): Try[Option[DirectUpdateInfo]] = {
+    def directUpdateRoutes(zkStateReader: ZkStateReader, op: Solr.SolrUpdateOperation, clusterState: ClusterState, collection: Option[String], reqTimeout: FiniteDuration): Try[Option[DirectUpdateInfo]] = {
         val (updateRequest, allParams, routableParams) = createParams(op)
 
         getRoutesForRequest(zkStateReader, clusterState, updateRequest, collection, routableParams) flatMap {
             case None ⇒ Success(None)
             case Some(routes) if routes.isEmpty ⇒ Failure(Solr.InvalidRequest("No routes found for request"))
-            case Some(routes) ⇒ Success(Some(DirectUpdateInfo(updateRequest, allParams, routes)))
+            case Some(routes) ⇒
+                val routesWithTimeout = routes mapValues (r ⇒ r.copy(op = r.op withTimeout reqTimeout))
+                Success(Some(DirectUpdateInfo(updateRequest, allParams, routesWithTimeout)))
+        }
+    }
+
+    def getNonRoutableUpdate(updateInfo: DirectUpdateInfo, reqTimeout: FiniteDuration): Option[LBClientConnection.ExtendedRequest] = {
+        val nonRoutableRequest: Option[UpdateRequest] = {
+            Option(updateInfo.updateRequest.getDeleteQuery) match {
+                case None ⇒ None
+                case Some(qs) if qs.isEmpty ⇒ None
+                case Some(qs) ⇒
+                    val deleteQueryRequest = new UpdateRequest()
+                    deleteQueryRequest setDeleteQuery qs
+                    Some(deleteQueryRequest)
+            }
+        }
+
+        val nonRoutableParams = nonRoutableParameters & updateInfo.allParams.params.keySet
+
+        if (nonRoutableRequest.isEmpty && nonRoutableParams.isEmpty)
+            None
+        else {
+            val request = nonRoutableRequest getOrElse new UpdateRequest()
+            request setParams new ModifiableSolrParams(updateInfo.allParams)
+
+            Some(LBClientConnection.ExtendedRequest(Solr.SolrUpdateOperation(request) withTimeout reqTimeout,
+                Random.shuffle(updateInfo.routes.keySet.toList)))
         }
     }
 

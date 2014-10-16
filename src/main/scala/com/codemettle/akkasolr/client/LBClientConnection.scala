@@ -1,7 +1,7 @@
 /*
  * LBClientConnection.scala
  *
- * Updated: Oct 10, 2014
+ * Updated: Oct 16, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -49,7 +49,10 @@ object LBClientConnection {
      * @param numDeadServersToTry The number of dead servers to try if there are no live servers left. Defaults to
      *                            the number of servers in this request if the number is less than 0.
      */
+    @SerialVersionUID(1L)
     case class ExtendedRequest(op: SolrOperation, servers: List[String], numDeadServersToTry: Int = -1)
+
+    @SerialVersionUID(1L)
     case class ExtendedResponse(response: SolrQueryResponse, server: String)
 
     private val emptyQuery = {

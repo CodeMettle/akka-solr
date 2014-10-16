@@ -21,7 +21,7 @@ import org.apache.solr.common.util.{NamedList, StrUtils}
 import org.apache.zookeeper.KeeperException
 
 import com.codemettle.akkasolr.Solr
-import com.codemettle.akkasolr.client.zk.ZkStateReaderWrapper.RouteResponse
+import com.codemettle.akkasolr.client.zk.ZkUtil._
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 
 import akka.actor.ActorRefFactory
@@ -36,7 +36,7 @@ import scala.util.{Failure, Random, Success, Try}
  * @author steven
  *
  */
-object ZkStateReaderWrapper {
+object ZkUtil {
     private val nonRoutableParameters = Set(UpdateParams.EXPUNGE_DELETES, UpdateParams.MAX_OPTIMIZE_SEGMENTS,
         UpdateParams.COMMIT, UpdateParams.WAIT_SEARCHER, UpdateParams.OPEN_SEARCHER, UpdateParams.SOFT_COMMIT,
         UpdateParams.PREPARE_COMMIT, UpdateParams.OPTIMIZE)
@@ -73,25 +73,9 @@ object ZkStateReaderWrapper {
         condensed.add("responseHeader", cheader)
         condensed
     }
-}
 
-class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptions)(implicit arf: ActorRefFactory) {
-    private implicit val dispatcher = Solr.Client.zookeeperDispatcher
-
-    def connect: Future[ZkStateReader] = {
-        Future {
-            val zk = new ZkStateReader(zkHost, config.clientTimeoutMS, config.connectTimeoutMS)
-            zk.createClusterStateWatchersAndUpdate()
-            zk
-        } transform(identity, {
-            case zke: ZooKeeperException ⇒ zke
-            case e@(_: InterruptedException | _: KeeperException | _: IOException | _: TimeoutException) ⇒
-                new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e)
-            case t ⇒ t
-        })
-    }
-
-    def getCollectionSet(reader: ZkStateReader, clusterState: ClusterState, collection: String): Try[Set[String]] = {
+    private def getCollectionSet(reader: ZkStateReader, clusterState: ClusterState,
+                                 collection: String): Try[Set[String]] = {
         def collectionsForCollectionName(collectionName: String): Try[Set[String]] = {
             if (clusterState.getCollections contains collectionName)
                 Success(Set(collectionName))
@@ -112,7 +96,7 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
         })
     }
 
-    def buildUrlMap(col: DocCollection): Option[ju.Map[String, ju.List[String]]] = {
+    private def buildUrlMap(col: DocCollection): Option[ju.Map[String, ju.List[String]]] = {
         //Create the URL map, which is keyed on slice name.
         //The value is a list of URLs for each replica in the slice.
         //The first value in the list is the leader for the slice.
@@ -146,14 +130,42 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
         }
     }
 
-    def createParams(op: Solr.SolrUpdateOperation): (UpdateRequest, ImmutableSolrParams, ImmutableSolrParams) = {
+    private def createParams(op: Solr.SolrUpdateOperation): (UpdateRequest, ImmutableSolrParams, ImmutableSolrParams) = {
         val updateRequest = op.solrJUpdateRequest
         val allParams = Option(updateRequest.getParams).fold(ImmutableSolrParams())(ImmutableSolrParams(_))
-        val routableParams = ImmutableSolrParams(allParams.params -- ZkStateReaderWrapper.nonRoutableParameters)
+        val routableParams = ImmutableSolrParams(allParams.params -- ZkUtil.nonRoutableParameters)
         (updateRequest, allParams, routableParams)
     }
 
-    def getDocCollectionForRequest(zkStateReader: ZkStateReader, clusterState: ClusterState,
+    private def getRouter(col: DocCollection): Try[Option[DocRouter]] = {
+        val router = Option(col.getRouter).fold[Try[DocRouter]](
+            Failure(Solr.InvalidRequest(s"No DocRouter found for ${col.getName}")))(Success(_))
+
+        router map {
+            case _: ImplicitDocRouter ⇒ None
+            case r ⇒ Some(r)
+        }
+    }
+}
+
+class ZkUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: ActorRefFactory) {
+    private implicit val dispatcher = Solr.Client.zookeeperDispatcher
+
+    def connect(zkHost: String): Future[ZkStateReader] = {
+
+        Future {
+            val zk = new ZkStateReader(zkHost, config.clientTimeoutMS, config.connectTimeoutMS)
+            zk.createClusterStateWatchersAndUpdate()
+            zk
+        } transform(identity, {
+            case zke: ZooKeeperException ⇒ zke
+            case e@(_: InterruptedException | _: KeeperException | _: IOException | _: TimeoutException) ⇒
+                new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e)
+            case t ⇒ t
+        })
+    }
+
+    private def getDocCollectionForRequest(zkStateReader: ZkStateReader, clusterState: ClusterState,
                                    allParams: ImmutableSolrParams): Try[DocCollection] = {
         def collectionName: Try[String] = {
             Option(allParams.get("collection", config.defaultCollection.orNull)) match {
@@ -177,27 +189,9 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
         })
     }
 
-    def getRouter(col: DocCollection): Try[Option[DocRouter]] = {
-
-        def router: Try[DocRouter] = Try {
-            Option(col.getRouter) getOrElse (throw Solr.InvalidRequest(s"No DocRouter found for ${col.getName}"))
-        }
-
-        router map {
-            case _: ImplicitDocRouter ⇒ None
-            case r ⇒ Some(r)
-        }
-    }
-
-    def getRoutes(req: UpdateRequest, router: DocRouter, col: DocCollection, urlMap: ju.Map[String, ju.List[String]],
-                  routableParams: SolrParams): Try[Option[Map[String, LBHttpSolrServer.Req]]] = {
-        Try(req.getRoutes(router, col, urlMap, new ModifiableSolrParams(routableParams), config.idField)) transform
-            (r ⇒ Success(Option(r) map (_.asScala.toMap)), t ⇒ Failure(Solr.InvalidRequest(t.getMessage)))
-    }
-
-    def getRoutesForRequest(zkStateReader: ZkStateReader, clusterState: ClusterState, req: UpdateRequest,
-                            allParams: ImmutableSolrParams,
-                            routableParams: ImmutableSolrParams): Try[Option[Map[String, LBHttpSolrServer.Req]]] = {
+    private def getRoutesForRequest(zkStateReader: ZkStateReader, clusterState: ClusterState, req: UpdateRequest,
+                                    allParams: ImmutableSolrParams,
+                                    routableParams: ImmutableSolrParams): Try[Option[Map[String, LBHttpSolrServer.Req]]] = {
         def createRoutingInfo(docCol: DocCollection, routerOpt: Option[DocRouter]) = {
             for {
                 router ← routerOpt
@@ -216,6 +210,13 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
             case None ⇒ Success(None)
             case Some((docCol, router, urlMap)) ⇒ getRoutes(req, router, docCol, urlMap, routableParams)
         }
+    }
+
+    private def getRoutes(req: UpdateRequest, router: DocRouter, col: DocCollection,
+                          urlMap: ju.Map[String, ju.List[String]],
+                          routableParams: SolrParams): Try[Option[Map[String, LBHttpSolrServer.Req]]] = {
+        Try(req.getRoutes(router, col, urlMap, new ModifiableSolrParams(routableParams), config.idField)) transform
+            (r ⇒ Success(Option(r) map (_.asScala.toMap)), t ⇒ Failure(Solr.InvalidRequest(t.getMessage)))
     }
 
     def fakeRunRequest(req: LBHttpSolrServer.Req): Future[NamedList[AnyRef]] = {
@@ -263,8 +264,8 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
         ???
     }
 
-    def directUpdate(zkStateReader: ZkStateReader, op: Solr.SolrUpdateOperation,
-                     clusterState: ClusterState): Future[Option[RouteResponse]] = {
+    private def directUpdate(zkStateReader: ZkStateReader, op: Solr.SolrUpdateOperation,
+                             clusterState: ClusterState): Future[Option[RouteResponse]] = {
         val (updateRequest, allParams, routableParams) = createParams(op)
 
         getRoutesForRequest(zkStateReader, clusterState, updateRequest, allParams, routableParams) match {
@@ -290,7 +291,7 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
                         }
                     }
 
-                    val nonRoutableParams = ZkStateReaderWrapper.nonRoutableParameters & allParams.params.keySet
+                    val nonRoutableParams = ZkUtil.nonRoutableParameters & allParams.params.keySet
 
                     def getFinalResponse: Future[Map[String, NamedList[AnyRef]]] = {
                         if (nonRoutableRequest.nonEmpty || nonRoutableParams.nonEmpty) {
@@ -309,14 +310,14 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
                     getFinalResponse map (responses ⇒ {
                         val end = System.nanoTime()
 
-                        Some(ZkStateReaderWrapper.condenseResponses(responses, (end - start).nanos.toMillis, routes))
+                        Some(ZkUtil.condenseResponses(responses, (end - start).nanos.toMillis, routes))
                     })
                 })
         }
     }
 
-    def getSlices(requestCollection: Option[String], zkStateReader: ZkStateReader,
-                  clusterState: ClusterState): Try[Map[String, Slice]] = {
+    private def getSlices(requestCollection: Option[String], zkStateReader: ZkStateReader,
+                          clusterState: ClusterState): Try[Map[String, Slice]] = {
         def collection: Try[String] = {
             requestCollection orElse config.defaultCollection match {
                 case None ⇒
@@ -356,8 +357,9 @@ class ZkStateReaderWrapper(zkHost: String, config: Solr.SolrCloudConnectionOptio
         })
     }
 
-    def runIndirectRequest(req: Solr.SolrOperation, requestCollection: Option[String], zkStateReader: ZkStateReader,
-                           clusterState: ClusterState, sendToLeaders: Boolean): Future[NamedList[AnyRef]] = {
+    private def runIndirectRequest(req: Solr.SolrOperation, requestCollection: Option[String],
+                                   zkStateReader: ZkStateReader, clusterState: ClusterState,
+                                   sendToLeaders: Boolean): Future[NamedList[AnyRef]] = {
 
         def createUrlList(slices: Map[String, Slice], liveNodes: Set[String]): Vector[String] = {
 

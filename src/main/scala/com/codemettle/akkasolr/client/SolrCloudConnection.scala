@@ -8,10 +8,11 @@
 package com.codemettle.akkasolr.client
 
 import org.apache.solr.common.cloud.ZkStateReader
+import org.apache.solr.common.util.NamedList
 
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.client.SolrCloudConnection.{Connect, OperateOnCollection, fsm}
-import com.codemettle.akkasolr.client.zk.{ZkRequestHandler, ZkUtil}
+import com.codemettle.akkasolr.client.zk.{ZkUpdateUtil, ZkRequestHandler, ZkUtil}
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
@@ -31,6 +32,10 @@ object SolrCloudConnection {
     @SerialVersionUID(1L)
     case class OperateOnCollection(op: Solr.SolrOperation, collection: String)
 
+    @SerialVersionUID(1L)
+    case class RouteResponse(routeResponses: Map[String, NamedList[AnyRef]],
+                             routes: Map[String, LBClientConnection.ExtendedRequest]) extends NamedList[AnyRef]
+
     object fsm {
         sealed trait State
         case object NotConnected extends State
@@ -47,6 +52,7 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
     extends FSM[fsm.State, fsm.Data] with ActorLogging {
 
     private val zkUtil = ZkUtil(config)
+    private val zkUpdateUtil = ZkUpdateUtil(config)
 
     private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
 
@@ -72,7 +78,7 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
                                timeout: FiniteDuration, origTimeout: FiniteDuration) = {
         val name = actorName.next()
         val props = ZkRequestHandler
-            .props(lbServer, zkStateReader, zkUtil, req, collection, sender(), timeout, origTimeout)
+            .props(lbServer, zkStateReader, zkUtil, zkUpdateUtil, req, collection, sender(), timeout, origTimeout)
 
         context.actorOf(props, name)
 

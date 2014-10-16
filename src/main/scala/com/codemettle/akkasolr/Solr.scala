@@ -10,6 +10,7 @@ package com.codemettle.akkasolr
 import java.{lang => jl, util => ju}
 
 import com.typesafe.config.Config
+import org.apache.solr.client.solrj.impl.LBHttpSolrServer
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION
 import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.SolrInputDocument
@@ -378,6 +379,11 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class AllServersDead()
         extends Exception("No live servers are available to service request") with NoStackTrace with AkkaSolrError
+
+    @SerialVersionUID(1L)
+    case class CloudException(exceptions: Map[String, Throwable], routes: Map[String, LBHttpSolrServer.Req])
+        extends Exception(s"Error(s) while running SolrCloud update - ${exceptions.values.head.getMessage}",
+                          exceptions.values.head) with NoStackTrace with AkkaSolrError
 
     /* **** types *****/
 

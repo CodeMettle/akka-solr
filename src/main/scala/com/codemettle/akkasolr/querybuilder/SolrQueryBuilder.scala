@@ -182,7 +182,7 @@ object SolrQueryBuilder {
      * Scala-ish
      */
     @SerialVersionUID(1L)
-    case class ImmutableSolrParams(params: HashMap[String, Vector[String]]) extends SolrParams {
+    case class ImmutableSolrParams(params: HashMap[String, Vector[String]] = HashMap.empty) extends SolrParams {
         override def get(param: String): String = {
             (params get param flatMap {
                 case null ⇒ None

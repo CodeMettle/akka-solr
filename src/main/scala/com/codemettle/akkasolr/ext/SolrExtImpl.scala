@@ -1,7 +1,7 @@
 /*
  * SolrExtImpl.scala
  *
- * Updated: Oct 10, 2014
+ * Updated: Oct 14, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -31,6 +31,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     val manager = eas.actorOf(Manager.props, "Solr")
 
     val responseParserDispatcher = eas.dispatchers lookup "akkasolr.response-parser-dispatcher"
+
+    lazy val zookeeperDispatcher = eas.dispatchers lookup "akkasolr.zookeeper-dispatcher"
 
     val maxBooleanClauses = config getInt "solrMaxBooleanClauses"
 

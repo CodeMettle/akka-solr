@@ -481,4 +481,45 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             )
         }
     }
+
+    @SerialVersionUID(1L)
+    case class SolrCloudConnectionOptions(zkConnectTimeout: FiniteDuration,
+                                          zkClientTimeout: FiniteDuration,
+                                          connectAtStart: Boolean,
+                                          defaultCollection: Option[String],
+                                          parallelUpdates: Boolean,
+                                          idField: String) {
+        private def intDuration(fd: FiniteDuration) = fd.toMillis match {
+            case ms if ms > Int.MaxValue ⇒ sys.error(s"$fd is too large")
+            case ms ⇒ ms.toInt
+        }
+
+        require(zkConnectTimeout.toMillis < Int.MaxValue, "zookeeper-connect-timeout must be < ~24 days")
+        require(zkClientTimeout.toMillis < Int.MaxValue, "zookeeper-client-timeout must be < ~24 days")
+
+        def connectTimeoutMS = intDuration(zkConnectTimeout)
+        def clientTimeoutMS = intDuration(zkClientTimeout)
+    }
+
+    object SolrCloudConnectionOptions extends SettingsCompanion[SolrCloudConnectionOptions]("akkasolr.solrcloud-connection-defaults") {
+
+        override def fromSubConfig(c: Config): SolrCloudConnectionOptions = {
+            import spray.util.pimpConfig
+
+            apply(
+                c getDuration "zookeeper-connect-timeout" match {
+                    case fd: FiniteDuration ⇒ fd
+                    case _ ⇒ 10.seconds
+                },
+                c getDuration "zookeeper-client-timeout" match {
+                    case fd: FiniteDuration ⇒ fd
+                    case _ ⇒ 10.seconds
+                },
+                c getBoolean "connect-at-start",
+                Option(c getString "default-collection") flatMap (s ⇒ if (s.trim.isEmpty) None else Some(s)),
+                c getBoolean "parallel-updates",
+                c getString "id-field"
+            )
+        }
+    }
 }

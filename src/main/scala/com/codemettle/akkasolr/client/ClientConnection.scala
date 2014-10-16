@@ -69,7 +69,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     private def pingServer(hostConn: ActorRef) = {
         val req = Solr.Ping()
-        serviceRequest(hostConn, req, self, req.options.requestTimeout)
+        serviceRequest(hostConn, req, self, req.requestTimeout)
     }
 
     whenUnhandled {
@@ -84,7 +84,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             stay()
 
         case Event(req: SolrOperation, _) ⇒
-            val to = req.options.requestTimeout
+            val to = req.requestTimeout
             stasher ! ConnectingStasher.WaitingRequest(sender(), req, to, to)
             stay()
 
@@ -112,7 +112,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
             IO(Http)(actorSystem) ! Http.HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort,
                 baseUri.isSsl, settings = Some(hostConnSettings))
 
-            val to = m.options.requestTimeout
+            val to = m.requestTimeout
 
             stasher ! ConnectingStasher.WaitingRequest(sender(), m, to, to)
 
@@ -160,7 +160,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     when(fsm.Connected) {
         case Event(m: SolrOperation, data) ⇒
-            serviceRequest(data.hostConn, m, sender(), m.options.requestTimeout)
+            serviceRequest(data.hostConn, m, sender(), m.requestTimeout)
             stay()
 
         case Event(ConnectingStasher.StashedRequest(act, req: Solr.SolrOperation, remaining, _), data) ⇒

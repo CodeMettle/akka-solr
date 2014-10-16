@@ -73,6 +73,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     sealed trait SolrOperation {
         def options: RequestOptions
 
+        def requestTimeout = options.requestTimeout
+
         def withOptions(opts: RequestOptions): SolrOperation
 
         def withTimeout(fd: FiniteDuration) = withOptions(options.copy(requestTimeout = fd))

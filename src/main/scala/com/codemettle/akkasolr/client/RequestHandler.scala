@@ -284,7 +284,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     }
 
     def receive = {
-        case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.options.requestTimeout))
+        case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.requestTimeout))
 
         case resp: HttpResponse ⇒
             log.debug("got non-chunked response: {}", resp)

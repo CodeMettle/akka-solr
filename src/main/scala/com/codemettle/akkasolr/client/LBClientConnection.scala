@@ -112,8 +112,7 @@ object LBClientConnection {
         import context.dispatcher
 
         private val startTime = System.nanoTime()
-        private val hardTimeout = actorSystem.scheduler
-            .scheduleOnce(op.options.requestTimeout + 1.second, self, ReqTimeout)
+        private val hardTimeout = actorSystem.scheduler.scheduleOnce(op.requestTimeout + 1.second, self, ReqTimeout)
         private var streaming = false
 
         protected def createResponse(from: SolrQueryResponse, current: Server): RespType
@@ -142,7 +141,7 @@ object LBClientConnection {
 
         private def tryNext(currNanoTime: Long, alive: List[Server], dead: Servers) = {
             val elapsedSinceStart = (currNanoTime - startTime).nanos
-            val newTimeout = op.options.requestTimeout - elapsedSinceStart
+            val newTimeout = op.requestTimeout - elapsedSinceStart
             def requestWithTimeout = op withTimeout newTimeout
 
             if (newTimeout > Duration.Zero) {
@@ -193,7 +192,7 @@ object LBClientConnection {
         private def handleTimeout: Receive = {
             case ReqTimeout ⇒
                 // this is only a fail-safe, the underlying connection should time out the request if the limit is hit
-                replyTo ! Status.Failure(Solr.RequestTimedOut(op.options.requestTimeout))
+                replyTo ! Status.Failure(Solr.RequestTimedOut(op.requestTimeout))
                 context stop self
         }
 

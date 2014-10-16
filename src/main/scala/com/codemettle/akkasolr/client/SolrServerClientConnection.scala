@@ -33,7 +33,7 @@ object SolrServerClientConnection {
     private class ReqHandler(solrServer: SolrServer, req: Solr.SolrOperation, replyTo: ActorRef) extends Actor {
         import context.dispatcher
 
-        val timeout = actorSystem.scheduler.scheduleOnce(req.options.requestTimeout, self, 'timeout)
+        val timeout = actorSystem.scheduler.scheduleOnce(req.requestTimeout, self, 'timeout)
 
         override def preStart() = {
             super.preStart()
@@ -103,7 +103,7 @@ object SolrServerClientConnection {
         }
 
         def receive = {
-            case 'timeout ⇒ sendError(Solr.RequestTimedOut(req.options.requestTimeout))
+            case 'timeout ⇒ sendError(Solr.RequestTimedOut(req.requestTimeout))
         }
     }
 }

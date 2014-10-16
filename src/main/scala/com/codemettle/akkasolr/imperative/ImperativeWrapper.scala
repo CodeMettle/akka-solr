@@ -28,7 +28,7 @@ import scala.concurrent.duration._
  */
 case class ImperativeWrapper(connection: ActorRef)(implicit arf: ActorRefFactory) {
     def call(op: Solr.SolrOperation): Future[SolrQueryResponse] = {
-        implicit val timeout = Timeout(op.options.requestTimeout + 5.seconds)
+        implicit val timeout = Timeout(op.requestTimeout + 5.seconds)
 
         (connection ? op).mapTo[SolrQueryResponse]
     }

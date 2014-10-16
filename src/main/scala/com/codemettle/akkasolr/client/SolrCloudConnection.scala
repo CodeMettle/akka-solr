@@ -45,7 +45,7 @@ object SolrCloudConnection {
 class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrCloudConnectionOptions)
     extends FSM[fsm.State, fsm.Data] with ActorLogging {
 
-    private val zkUtil = new ZkUtil(config)
+    private val zkUtil = ZkUtil(config)
 
     private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
 

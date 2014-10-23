@@ -1,7 +1,7 @@
 /*
  * RequestHandler.scala
  *
- * Updated: Oct 14, 2014
+ * Updated: Oct 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -247,10 +247,12 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
         }
 
         resp.status match {
+                /*  server sends a useful response for a 400...others might too, TODO test other errors
             case StatusCodes.BadRequest ⇒
                 sendError(Solr.ServerError(resp.status, s"Is the query malformed? Does it have more than ${
                     Solr.Client.maxBooleanClauses
                 } boolean clauses?"))
+                */
 
             case StatusCodes.Forbidden ⇒
                 sendError(Solr.ServerError(resp.status, "Authentication is currently unsupported"))

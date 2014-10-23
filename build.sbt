@@ -6,7 +6,7 @@ organization := "com.codemettle.akka-solr"
 
 name := "akka-solr"
 
-version := "0.10.0-SNAPSHOT"
+version := "0.11.0-SNAPSHOT"
 
 description := "Solr HTTP client using Akka and Spray"
 

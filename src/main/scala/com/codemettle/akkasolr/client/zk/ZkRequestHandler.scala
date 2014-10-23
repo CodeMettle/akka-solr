@@ -1,7 +1,7 @@
 /*
  * ZkRequestHandler.scala
  *
- * Updated: Oct 16, 2014
+ * Updated: Oct 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -27,10 +27,10 @@ import scala.util.{Failure, Success}
  */
 object ZkRequestHandler {
     def props(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkUtil: ZkUtil, zkUpdateUtil: ZkUpdateUtil,
-              request: Solr.SolrOperation, specificCollection: Option[String], replyTo: ActorRef,
-              reqTimeout: FiniteDuration, origTimeout: FiniteDuration) = {
-        Props(new ZkRequestHandler(lbConnection, zkStateReader, zkUtil, zkUpdateUtil, request, specificCollection,
-            replyTo, reqTimeout, origTimeout))
+              specificCollection: Option[String], replyTo: ActorRef, reqTimeout: FiniteDuration,
+              origTimeout: FiniteDuration) = {
+        Props(new ZkRequestHandler(lbConnection, zkStateReader, zkUtil, zkUpdateUtil, specificCollection, replyTo,
+            reqTimeout, origTimeout))
     }
 
     private case object TimedOut
@@ -142,8 +142,8 @@ object ZkRequestHandler {
 }
 
 class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkUtil: ZkUtil, zkUpdateUtil: ZkUpdateUtil,
-                       request: Solr.SolrOperation, specificCollection: Option[String], replyTo: ActorRef,
-                       reqTimeout: FiniteDuration, origTimeout: FiniteDuration) extends Actor {
+                       specificCollection: Option[String], replyTo: ActorRef, reqTimeout: FiniteDuration,
+                       origTimeout: FiniteDuration) extends Actor with ActorLogging {
     import context.dispatcher
 
     private val timeout = actorSystem.scheduler.scheduleOnce(reqTimeout, self, TimedOut)
@@ -155,11 +155,12 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
     }
 
     private def sendError(error: Throwable) = {
+        log.debug("Sending {} error to {} as {}", error.getClass.getSimpleName, replyTo, context.parent)
         replyTo.tell(Status.Failure(error), context.parent)
         self ! PoisonPill
     }
 
-    private def handleCompleteUpdate(updateInfo: DirectUpdateInfo,
+    private def handleCompleteUpdate(request: Solr.SolrOperation, updateInfo: DirectUpdateInfo,
                                      responses: Map[String, LBClientConnection.ExtendedResponse], startTime: Long) = {
         val endTime = System.nanoTime()
         val routeResp = ZkUpdateUtil.condenseResponses(responses mapValues (_.response.original.getResponse),
@@ -177,6 +178,7 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
             case Failure(t) ⇒ sendError(t)
             case Success(urls) if urls.isEmpty ⇒ sendError(Solr.InvalidRequest("No URLs found for request"))
             case Success(urls) ⇒
+                log.debug("Sending request to {}", urls)
                 lbConnection ! LBClientConnection.ExtendedRequest(op, urls.toList)
                 context become waitingForRegularResponse
         }
@@ -197,7 +199,7 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
                     else
                         context actorOf SerialDirectUpdateHandler.props(lbConnection, updateInfo)
 
-                    context become waitingForDirectUpdateResponse(updateInfo, startTime)
+                    context become waitingForDirectUpdateResponse(op, updateInfo, startTime)
             }
 
         case _ ⇒ handleRegular(op, collection, isUpdateRequest = false)
@@ -220,21 +222,22 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
             context stop self
     }
 
-    def waitingForDirectUpdateResponse(updateInfo: DirectUpdateInfo, startTime: Long): Receive = {
+    def waitingForDirectUpdateResponse(req: Solr.SolrOperation, updateInfo: DirectUpdateInfo,
+                                       startTime: Long): Receive = {
         case Status.Failure(t) ⇒ sendError(t)
         case UpdatesResponse(shardResponses) ⇒ zkUpdateUtil.getNonRoutableUpdate(updateInfo, reqTimeout) match {
-            case None ⇒ handleCompleteUpdate(updateInfo, shardResponses, startTime)
-            case Some(req) ⇒
-                lbConnection ! req
-                context become waitingForRegularUpdateResponse(updateInfo, shardResponses, startTime)
+            case None ⇒ handleCompleteUpdate(req, updateInfo, shardResponses, startTime)
+            case Some(lbReq) ⇒
+                lbConnection ! lbReq
+                context become waitingForRegularUpdateResponse(req, updateInfo, shardResponses, startTime)
         }
     }
 
-    def waitingForRegularUpdateResponse(updateInfo: DirectUpdateInfo,
+    def waitingForRegularUpdateResponse(req: Solr.SolrOperation, updateInfo: DirectUpdateInfo,
                                         shardResponses: Map[String, LBClientConnection.ExtendedResponse],
                                         startTime: Long): Receive = {
         case Status.Failure(t) ⇒ sendError(t)
         case r: LBClientConnection.ExtendedResponse ⇒
-            handleCompleteUpdate(updateInfo, shardResponses + (r.server → r), startTime)
+            handleCompleteUpdate(req, updateInfo, shardResponses + (r.server → r), startTime)
     }
 }

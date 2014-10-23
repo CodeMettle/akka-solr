@@ -1,7 +1,7 @@
 /*
  * SolrCloudConnection.scala
  *
- * Updated: Oct 16, 2014
+ * Updated: Oct 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -74,13 +74,15 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
         }
     }
 
-    private def serviceRequest(zkStateReader: ZkStateReader, req: Solr.SolrOperation, collection: Option[String],
+    private def serviceRequest(replyTo: ActorRef, zkStateReader: ZkStateReader, request: Any,
                                timeout: FiniteDuration, origTimeout: FiniteDuration) = {
         val name = actorName.next()
-        val props = ZkRequestHandler
-            .props(lbServer, zkStateReader, zkUtil, zkUpdateUtil, req, collection, sender(), timeout, origTimeout)
+        val props = ZkRequestHandler.props(lbServer, zkStateReader, zkUtil, zkUpdateUtil, config.defaultCollection,
+            replyTo, timeout, origTimeout)
 
-        context.actorOf(props, name)
+        val reqHandler = context.actorOf(props, name)
+
+        reqHandler ! request
 
         stay()
     }
@@ -125,16 +127,16 @@ class SolrCloudConnection(lbServer: ActorRef, zkHost: String, config: Solr.SolrC
 
     when(fsm.Connected) {
         case Event(ConnectingStasher.StashedRequest(replyTo, req: Solr.SolrOperation, timeout, origTimeout), fsm.Data(reader)) ⇒
-            serviceRequest(reader, req, None, timeout, origTimeout)
+            serviceRequest(replyTo, reader, req, timeout, origTimeout)
 
-        case Event(ConnectingStasher.StashedRequest(replyTo, OperateOnCollection(req, collection), timeout, origTimeout), fsm.Data(reader)) ⇒
-            serviceRequest(reader, req, Some(collection), timeout, origTimeout)
+        case Event(ConnectingStasher.StashedRequest(replyTo, req: OperateOnCollection, timeout, origTimeout), fsm.Data(reader)) ⇒
+            serviceRequest(replyTo, reader, req, timeout, origTimeout)
 
-        case Event(OperateOnCollection(op, collection), fsm.Data(reader)) ⇒
-            serviceRequest(reader, op, Some(collection), op.requestTimeout, op.requestTimeout)
+        case Event(req@OperateOnCollection(op, _), fsm.Data(reader)) ⇒
+            serviceRequest(sender(), reader, req, op.requestTimeout, op.requestTimeout)
 
         case Event(op: Solr.SolrOperation, fsm.Data(reader)) ⇒
-            serviceRequest(reader, op, None, op.requestTimeout, op.requestTimeout)
+            serviceRequest(sender(), reader, op, op.requestTimeout, op.requestTimeout)
     }
 
     initialize()

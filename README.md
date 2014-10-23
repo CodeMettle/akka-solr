@@ -7,7 +7,7 @@ A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
 The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
 
 #### Note about blocking:
-In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome.
+In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome. Along the same lines, SolrJ's ZkStateReader class is used for ZooKeeper/SolrCloud support, it has a configurable dispatcher that will be created upon first usage.
 
 
 Import
@@ -195,7 +195,6 @@ Plans
 -----
 
 * Tests - I'm not a unit-testing expert, any help is appreciated
-* ZooKeeper support (ala CloudSolrServer)
 * Add more Scala-friendly request/response wrappers as requested.
   * Sub-queries? (can provide queries without using builders)
   * document field weights? (can provide queries without using builders)
@@ -219,6 +218,11 @@ Changelog
   * Add the `LBClientConnection` class that behaves pretty much exactly the same as SolrJ's `org.apache.solr.client.solrj.impl.LBHttpSolrServer` class
     * `LBHttpSolrServer` attempts to cycle through servers in order (but the order is changed at runtime when failures happen), `LBClientConnection` uses a random order on every request
     * `LBHttpSolrServer.Req` (lets the user specify a list of servers to try per request that don't necessarily have to be servers that the connection was configured to handle) is reproduced by sending `LBClientConnection.ExtendedRequest` messages to the `LBClientConnection` (`LBHttpSolrServer.Rsp` -> `LBClientConnection.ExtendedResponse`)
+  * Add the `SolrCloudConnection` class that behaves pretty much exactly the same as SolrJ's `org.apache.solr.client.solrj.impl.CloudSolrServer` class
+    * `CloudSolrServer` has a `setDefaultCollection()` method to set default collections for requests, `SolrCloudConnection`s can be created with a default collection by providing a `Solr.SolrCloudConnectionOptions` instance with `defaultCollection` set; no runtime changes are currently supported
+    * `CloudSolrServer` looks for a `"collection"` parameter in requests to override the default (or provide this required piece of data if `setDefaultCollection()` hasn't been called); `SolrCloudConnection` accepts `SolrCloudConnection.OperateOnCollection` messages that provide a per-request collection parameter
+    * `Solr.Client.solrCloudClientTo` and its brethern (imperative client, client future) take a host string in the form "host:port,host:port" and accept `SolrCloudConnectionOptions` to set the default collection and other configuration
+    * `Solr.Client.clientTo` and its brethern accept connection strings in the form "zk://host:port,host:port" and create a `SolrCloudConnection`; using this method requires that every request be sent in a `SolrCloudConnection.OperateOnCollection` message
 * **0.9.2**
   * Add support in SolrQueryBuilder for facetLimit, facetMinCount, and facetPrefix
 * **0.9.1**

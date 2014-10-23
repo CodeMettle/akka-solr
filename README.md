@@ -228,4 +228,4 @@ Changelog
 Credits
 -------
 * Authored by [@codingismy11to7](https://github.com/codingismy11to7) for [@CodeMettle](https://github.com/CodeMettle)
-  * I have used (and contributed to) [@takezoe](https://github.com/takezoe)'s [solr-scala-client](https://github.com/takezoe/solr-scala-client) library extensively. I submitted a patch to make its query builders immutable-ish; akka-solr's query builders are completely immutable but have some similarities (ie `<query> rows 100 start 0` syntax). I also submitted the capability to use an `EmbeddedSolrServer` for unit testing. A fine library that we have used in production; its only drawback for us was lack of an Akka-native interface and dependency on Netty for async HTTP.
+  * We've used [@takezoe](https://github.com/takezoe)'s [solr-scala-client](https://github.com/takezoe/solr-scala-client) library extensively in production, and submitted features. akka-solr has no code from solr-scala-client, but there are some superficial similarities. It's a fine library if you need an asynchronous Solr client but don't use Akka.

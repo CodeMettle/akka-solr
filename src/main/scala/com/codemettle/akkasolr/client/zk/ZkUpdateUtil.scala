@@ -1,7 +1,7 @@
 /*
  * ZkUpdateUtil.scala
  *
- * Updated: Oct 16, 2014
+ * Updated: Oct 23, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -135,7 +135,8 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
 
                 (for {
                     aliases ← Option(zkStateReader.getAliases)
-                    alias ← aliases.getCollectionAliasMap.asScala get collName
+                    aliasMap ← Option(aliases.getCollectionAliasMap)
+                    alias ← aliasMap.asScala get collName
                 } yield alias) getOrElse collName
             }
         }

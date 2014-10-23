@@ -213,6 +213,12 @@ License
 Changelog
 ---------
 
+* **0.10.0**
+  * `SolrQueryBuilder.query` is no longer a String, it is a `SolrQueryStringBuilder.QueryPart` for easier modification of queries
+  * Responses to operations should now come from the Connection actor instead of the transient Request Handler actors
+  * Add the `LBClientConnection` class that behaves pretty much exactly the same as SolrJ's `org.apache.solr.client.solrj.impl.LBHttpSolrServer` class
+    * `LBHttpSolrServer` attempts to cycle through servers in order (but the order is changed at runtime when failures happen), `LBClientConnection` uses a random order on every request
+    * `LBHttpSolrServer.Req` (lets the user specify a list of servers to try per request that don't necessarily have to be servers that the connection was configured to handle) is reproduced by sending `LBClientConnection.ExtendedRequest` messages to the `LBClientConnection` (`LBHttpSolrServer.Rsp` -> `LBClientConnection.ExtendedResponse`)
 * **0.9.2**
   * Add support in SolrQueryBuilder for facetLimit, facetMinCount, and facetPrefix
 * **0.9.1**

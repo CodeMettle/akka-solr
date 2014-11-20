@@ -1,7 +1,7 @@
 /*
  * Manager.scala
  *
- * Updated: Oct 16, 2014
+ * Updated: Nov 20, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -39,10 +39,11 @@ object Manager {
 
 class Manager extends Actor {
     private var connections = Map.empty[Uri, ActorRef]
-    private var lbConnections = Map.empty[Set[Uri], ActorRef]
-    private var solrCloudConnections = Map.empty[String, (ActorRef, ActorRef)]
+    private var lbConnections = Map.empty[(Set[Uri], LBConnectionOptions), ActorRef]
+    private var solrCloudConnections = Map.empty[(String, SolrCloudConnectionOptions), (ActorRef, ActorRef)]
 
     private val lbNamer = Util actorNamer "loadBalancer"
+    private val zkNamer = Util actorNamer "zkClient"
 
     private def getConnection(uri: Uri, addr: String): ActorRef = {
         connections get uri match {
@@ -61,7 +62,7 @@ class Manager extends Actor {
     }
 
     private def getLbConnection(addrs: Map[Uri, String], opts: LBConnectionOptions): ActorRef = {
-        lbConnections get addrs.keySet match {
+        lbConnections get (addrs.keySet → opts) match {
             case Some(c) ⇒ c
             case None ⇒
                 val connections = addrs map {
@@ -69,20 +70,19 @@ class Manager extends Actor {
                 }
 
                 val actor = createLbConnection(connections, opts)
-                lbConnections += (addrs.keySet → actor)
+                lbConnections += ((addrs.keySet → opts) → actor)
                 actor
         }
     }
 
     private def getSolrCloudConnection(zkHost: String, opts: SolrCloudConnectionOptions): ActorRef = {
-        solrCloudConnections get zkHost match {
+        solrCloudConnections get (zkHost → opts) match {
             case Some((c, _)) ⇒ c
             case None ⇒
-                val name = connName.replaceAllIn(zkHost, "-")
                 val lbServer = createLbConnection(Nil, LBConnectionOptions(actorSystem))
-                val actor = context.actorOf(SolrCloudConnection.props(lbServer, zkHost, opts), name)
+                val actor = context.actorOf(SolrCloudConnection.props(lbServer, zkHost, opts), zkNamer.next())
                 context watch actor
-                solrCloudConnections += (zkHost → (actor → lbServer))
+                solrCloudConnections += ((zkHost → opts) → (actor → lbServer))
                 actor
         }
     }

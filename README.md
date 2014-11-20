@@ -212,6 +212,8 @@ License
 Changelog
 ---------
 
+* **0.10.1**
+  * Bugfix - asking for a SolrCloud/LoadBalanced connection with different options but same address as existing would return the existing connection instead of creating a new connection with different connection options (especially visible for SolrCloud connections with different defaultCollection settings)
 * **0.10.0**
   * `SolrQueryBuilder.query` is no longer a String, it is a `SolrQueryStringBuilder.QueryPart` for easier modification of queries
   * Responses to operations should now come from the Connection actor instead of the transient Request Handler actors

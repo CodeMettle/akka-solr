@@ -39,4 +39,12 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
 
     @transient
     lazy val qTime = original.getQTime
+
+    @transient
+    lazy val nextCursorMarkOpt = {
+        Option(original.getResponse.get(/*CursorMarkParams.CURSOR_MARK_NEXT*/"nextCursorMark").asInstanceOf[String])
+    }
+
+    @transient
+    lazy val nextCursorMarkUnsafe = nextCursorMarkOpt getOrElse sys.error("No nextCursorMark in response")
 }

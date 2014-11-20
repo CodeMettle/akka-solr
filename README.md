@@ -213,7 +213,7 @@ Changelog
 ---------
 
 * **0.10.2**
-  * Support for cursorMark in SolrQueryBuilder and nextCursorMark in SolrQueryResponse. Cursors require Solr 4.7.1, but akka-solr hard-codes the constants from SolrJ's CursorMarkParams to maintain compatibility with SolrJ < 4.7.1
+  * Support for cursorMark in `SolrQueryBuilder` and nextCursorMark in `SolrQueryResponse`. Cursors require Solr 4.7.1, but akka-solr hard-codes the constants from SolrJ's `CursorMarkParams` to maintain compatibility with SolrJ < 4.7.1
 * **0.10.1**
   * Bugfix - asking for a SolrCloud/LoadBalanced connection with different options but same address as existing would return the existing connection instead of creating a new connection with different connection options (especially visible for SolrCloud connections with different defaultCollection settings)
 * **0.10.0**

@@ -44,7 +44,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None,
                             facetLimit: Option[Int] = None, facetMinCount: Option[Int] = None,
-                            facetPrefix: Option[String] = None) {
+                            facetPrefix: Option[String] = None, cursorMarkOpt: Option[String] = None) {
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -55,9 +55,25 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutRows() = copy(rowsOpt = None)
 
-    def start(s: Int) = copy(startOpt = Some(s))
+    def start(s: Int) = {
+        if (cursorMarkOpt.isDefined)
+            throw new IllegalArgumentException("'start' and 'cursorMark' options are mutually exclusive")
+
+        copy(startOpt = Some(s))
+    }
 
     def withoutStart() = copy(startOpt = None)
+
+    def cursorMark(c: String) = {
+        if (startOpt.isDefined)
+            throw new IllegalArgumentException("'start' and 'cursorMark' options are mutually exclusive")
+
+        copy(cursorMarkOpt = Some(c))
+    }
+
+    def withoutCursorMark() = copy(cursorMarkOpt = None)
+
+    def beginCursor() = cursorMark(/*CursorMarkParams.CURSOR_MARK_START*/"*")
 
     def fields(fs: String*) = copy(fieldList = fs.toVector)
 
@@ -137,6 +153,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
         rowsOpt foreach (r ⇒ solrQuery setRows r)
         startOpt foreach (s ⇒ solrQuery setStart s)
+        cursorMarkOpt foreach (c ⇒ solrQuery.set(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark", c))
         solrQuery setFields (fieldList.toSeq: _*)
         sortsList foreach (s ⇒ solrQuery addSort s)
         if (facetFields.nonEmpty)
@@ -161,6 +178,7 @@ object SolrQueryBuilder {
     def fromSolrQuery(params: SolrQuery) = {
         def rows = Option(params.getRows) map (_.intValue())
         def start = Option(params.getStart) map (_.intValue())
+        def cursorMark = Option(params.get(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark"))
         def fields = Option(params.getFields) map (_.split("\\s*,\\s*").toVector) getOrElse Vector.empty
         def sorts = params.getSorts.asScala.toVector
         def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
@@ -170,7 +188,7 @@ object SolrQueryBuilder {
         def facetPrefix = Option(params.get(FacetParams.FACET_PREFIX))
 
         SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, facetLimit,
-            facetMinCount, facetPrefix)
+            facetMinCount, facetPrefix, cursorMark)
     }
 
     /*

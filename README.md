@@ -4,10 +4,10 @@ akka-solr
 A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
 [![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/0.10)](https://travis-ci.org/CodeMettle/akka-solr)
 
-The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
+The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
 
 #### Note about blocking:
-In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome. Along the same lines, SolrJ's ZkStateReader class is used for ZooKeeper/SolrCloud support, it has a configurable dispatcher that will be created upon first usage.
+In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome. Along the same lines, SolrJ's `ZkStateReader` class is used for ZooKeeper/SolrCloud support, it has a configurable dispatcher that will be created upon first usage.
 
 
 Import
@@ -214,6 +214,7 @@ Changelog
 
 * **0.10.2**
   * Support for cursorMark in `SolrQueryBuilder` and nextCursorMark in `SolrQueryResponse`. Cursors require Solr 4.7.1, but akka-solr hard-codes the constants from SolrJ's `CursorMarkParams` to maintain compatibility with SolrJ < 4.7.1
+  * `SolrQueryBuilder.withSortIfNewField(SortClause)`
 * **0.10.1**
   * Bugfix - asking for a SolrCloud/LoadBalanced connection with different options but same address as existing would return the existing connection instead of creating a new connection with different connection options (especially visible for SolrCloud connections with different defaultCollection settings)
 * **0.10.0**

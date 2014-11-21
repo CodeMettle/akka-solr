@@ -1,7 +1,7 @@
 /*
  * SolrQueryBuilder.scala
  *
- * Updated: Oct 9, 2014
+ * Updated: Nov 21, 2014
  *
  * Copyright (c) 2014, CodeMettle
  */
@@ -95,6 +95,11 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         case idx if idx < 0 ⇒ copy(sortsList = sortsList :+ sc)
         case idx ⇒ copy(sortsList = sortsList updated (idx, sc))
     }
+
+    /**
+     * Adds a new sort field only if there isn't already a sort on this field
+     */
+    def withSortIfNewField(sc: SortClause) = (sortsList find (_.getItem == sc.getItem)).fold(this withSort sc)(_ ⇒ this)
 
     def withSorts(scs: SortClause*) = (this /: scs) { case (sqc, sc) ⇒ sqc withSort sc }
 

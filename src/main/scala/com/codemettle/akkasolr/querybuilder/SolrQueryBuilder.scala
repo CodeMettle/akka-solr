@@ -64,7 +64,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutStart() = copy(startOpt = None)
 
-    def cursorMark(c: String) = {
+    def withCursorMark(c: String) = {
         if (startOpt.isDefined)
             throw new IllegalArgumentException("'start' and 'cursorMark' options are mutually exclusive")
 
@@ -73,7 +73,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutCursorMark() = copy(cursorMarkOpt = None)
 
-    def beginCursor() = cursorMark(/*CursorMarkParams.CURSOR_MARK_START*/"*")
+    def beginCursor() = withCursorMark(/*CursorMarkParams.CURSOR_MARK_START*/"*")
 
     def fields(fs: String*) = copy(fieldList = fs.toVector)
 

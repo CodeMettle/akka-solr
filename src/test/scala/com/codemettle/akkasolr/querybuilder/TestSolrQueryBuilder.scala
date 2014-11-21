@@ -105,7 +105,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         the[IllegalArgumentException] thrownBy (Solr createQuery "*" start 5 beginCursor()) should have message
             "'start' and 'cursorMark' options are mutually exclusive"
 
-        the[IllegalArgumentException] thrownBy (Solr createQuery "*" cursorMark "abc" start 5) should have message
+        the[IllegalArgumentException] thrownBy (Solr createQuery "*" withCursorMark "abc" start 5) should have message
             "'start' and 'cursorMark' options are mutually exclusive"
     }
 

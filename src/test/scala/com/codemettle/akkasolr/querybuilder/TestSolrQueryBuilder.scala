@@ -82,6 +82,33 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         checkEquals(sq, sqc)
     }
 
+    it should "add supported fields with cursor" in {
+        val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix "testing"
+
+        val sq = new SolrQuery("*")
+        sq.setRows(42)
+        sq.set(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark", "*")
+        sq.setFields("f1", "f2")
+        sq.addSort("f2", SolrQuery.ORDER.desc)
+        sq.addSort("f1", SolrQuery.ORDER.asc)
+        sq.addFacetField("f1")
+        sq.setTimeAllowed(60000)
+        sq.setFacetLimit(10)
+        sq.setFacetMinCount(1)
+        sq.setFacetPrefix("testing")
+
+        checkEquals(sq, sqc)
+    }
+
+    it should "disallow start+cursor" in {
+        the[IllegalArgumentException] thrownBy (Solr createQuery "*" start 5 beginCursor()) should have message
+            "'start' and 'cursorMark' options are mutually exclusive"
+
+        the[IllegalArgumentException] thrownBy (Solr createQuery "*" withCursorMark "abc" start 5) should have message
+            "'start' and 'cursorMark' options are mutually exclusive"
+    }
+
     it should "deal with changes" in {
         val sqc = Solr createQuery "*"
         val sq = new SolrQuery("*")
@@ -200,5 +227,13 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb7.facetLimit.value should equal (42)
         sqb7.facetMinCount.value should equal (12)
         sqb7.facetPrefix.value should equal ("fp")
+
+        q.setStart(null)
+        q.set(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark", "abc")
+
+        val sqb8 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb8.startOpt should be ('empty)
+        sqb8.cursorMarkOpt.value should equal ("abc")
     }
 }

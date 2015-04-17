@@ -100,13 +100,9 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
     setReleaseVersion,
     commitReleaseVersion,
     tagRelease,
-    ReleaseStep(
-        action = state ⇒ Project.extract(state).runTask(PgpKeys.publishSigned, state)._1,
-        enableCrossBuild = true
-    ),
+//    publishArtifacts,
     setNextVersion,
     commitNextVersion,
-    ReleaseStep(state ⇒ Project.extract(state).runTask(SonatypeKeys.sonatypeReleaseAll, state)._1),
     pushChanges
 )
 

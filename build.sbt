@@ -110,6 +110,8 @@ ReleaseKeys.releaseProcess := Seq[ReleaseStep](
     pushChanges
 )
 
+releaseSettings
+
 // Publish
 
 xerial.sbt.Sonatype.sonatypeSettings

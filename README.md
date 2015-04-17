@@ -22,7 +22,7 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "0.9.0",
+    "com.codemettle.akka-solr" %% "akka-solr" % "1.0.0",
     "org.apache.solr" % "solr-solrj" % "4.5.1" // later versions should work but are untested
 )
 ```
@@ -33,7 +33,7 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>0.9.0</version>
+    <version>1.0.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
@@ -213,6 +213,9 @@ License
 Changelog
 ---------
 
+* **1.0.0**
+  * Update build to build against 2.10.5 and 2.11.6
+  * No code changes, but the project has been in production long enough to mark it as 1.0.
 * **0.10.2**
   * Support for cursorMark in `SolrQueryBuilder` and nextCursorMark in `SolrQueryResponse`. Cursors require Solr 4.7.1, but akka-solr hard-codes the constants from SolrJ's `CursorMarkParams` to maintain compatibility with SolrJ < 4.7.1
   * `SolrQueryBuilder.withSortIfNewField(SortClause)`

@@ -8,7 +8,7 @@
 package com.codemettle.akkasolr.querybuilder
 
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.common.params.SolrParams
+import org.apache.solr.common.params.{GroupParams, SolrParams}
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
@@ -65,7 +65,9 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
     it should "add supported fields" in {
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
-            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix "testing"
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
+            "testing" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
+            "simple" groupInMain true groupFacetCounts true truncateGroupings true
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -78,13 +80,22 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetLimit(10)
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
+        sq.add(GroupParams.GROUP, "true")
+        sq.add(GroupParams.GROUP_FIELD, "f1")
+        sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        sq.add(GroupParams.GROUP_FORMAT, "simple")
+        sq.add(GroupParams.GROUP_MAIN, "true")
+        sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
+        sq.add(GroupParams.GROUP_TRUNCATE, "true")
 
         checkEquals(sq, sqc)
     }
 
     it should "add supported fields with cursor" in {
         val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
-            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix "testing"
+            "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
+            "testing" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
+            "simple" groupInMain true groupFacetCounts true truncateGroupings true
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -97,6 +108,13 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetLimit(10)
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
+        sq.add(GroupParams.GROUP, "true")
+        sq.add(GroupParams.GROUP_FIELD, "f1")
+        sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        sq.add(GroupParams.GROUP_FORMAT, "simple")
+        sq.add(GroupParams.GROUP_MAIN, "true")
+        sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
+        sq.add(GroupParams.GROUP_TRUNCATE, "true")
 
         checkEquals(sq, sqc)
     }
@@ -178,6 +196,12 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb1.facetLimit should be ('empty)
         sqb1.facetMinCount should be ('empty)
         sqb1.facetPrefix should be ('empty)
+        sqb1.groupField should be ('empty)
+        sqb1.groupSortsList should be ('empty)
+        sqb1.groupFormat should be ('empty)
+        sqb1.groupMain should be ('empty)
+        sqb1.groupTotalCount should be ('empty)
+        sqb1.groupTruncate should be ('empty)
 
         q setRows 10
 
@@ -235,5 +259,22 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
         sqb8.startOpt should be ('empty)
         sqb8.cursorMarkOpt.value should equal ("abc")
+
+        q.add(GroupParams.GROUP, "true")
+        q.add(GroupParams.GROUP_FIELD, "f1")
+        q.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        q.add(GroupParams.GROUP_FORMAT, "simple")
+        q.add(GroupParams.GROUP_MAIN, "true")
+        q.add(GroupParams.GROUP_TOTAL_COUNT, "true")
+        q.add(GroupParams.GROUP_TRUNCATE, "true")
+
+        val sqb9 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb9.groupField.value should equal("f1")
+        sqb9.groupSortsList should equal(Vector("f1".asc, "f2".descending))
+        sqb9.groupFormat.value should equal("simple")
+        sqb9.groupMain.value should equal(true)
+        sqb9.groupTotalCount.value should equal(true)
+        sqb9.groupTruncate.value should equal(true)
     }
 }

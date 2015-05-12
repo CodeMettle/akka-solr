@@ -12,7 +12,7 @@ import java.{util => ju}
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
-import org.apache.solr.common.params.{FacetParams, SolrParams}
+import org.apache.solr.common.params.{GroupParams, FacetParams, SolrParams}
 
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
@@ -44,7 +44,10 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
                             facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None,
                             facetLimit: Option[Int] = None, facetMinCount: Option[Int] = None,
-                            facetPrefix: Option[String] = None, cursorMarkOpt: Option[String] = None) {
+                            facetPrefix: Option[String] = None, cursorMarkOpt: Option[String] = None,
+                            groupField:Option[String] = None, groupSortsList: Vector[SortClause] = Vector.empty,
+                            groupFormat:Option[String] = None, groupMain:Option[Boolean] = None,
+                            groupTotalCount:Option[Boolean] = None, groupTruncate:Option[Boolean] = None) {
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -133,6 +136,33 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutFacetPrefix() = if (facetPrefix.isEmpty) this else copy(facetPrefix = None)
 
+    def withGroupField(gf:String) = if (groupField.isDefined) this else copy(groupField = Some(gf))
+
+    def withoutGroupField() = if (groupField.isEmpty) this else copy(groupField = None)
+
+    def groupSort(sc: SortClause) = copy(groupSortsList = Vector(sc))
+
+    def withGroupSort(sc: SortClause) = groupSortsList indexWhere (_.getItem == sc.getItem) match {
+        case idx if idx < 0 ⇒ copy(groupSortsList = groupSortsList :+ sc)
+        case idx ⇒ copy(groupSortsList = groupSortsList updated (idx, sc))
+    }
+
+    def withGroupSorts(scs: SortClause*) = (this /: scs) { case (sqc, sc) ⇒ sqc withGroupSort sc }
+
+    def withoutGroupSort(sc: SortClause) = copy(groupSortsList = sortsList filterNot (_ == sc))
+
+    def withoutGroupSorts() = if (groupSortsList.isEmpty) this else copy(groupSortsList = Vector.empty)
+
+    def withGroupFormat(gf:String) = if (groupFormat.isDefined) this else copy(groupFormat = Some(gf))
+
+    def withoutGroupFormat() = if (groupFormat.isEmpty) this else copy(groupFormat = None)
+
+    def groupInMain(tf: Boolean) = copy(groupMain = Some(tf))
+
+    def groupFacetCounts(tf: Boolean) = copy(groupTotalCount = Some(tf))
+
+    def truncateGroupings(tf:Boolean) = copy(groupTruncate = Some(tf))
+
     def allowedExecutionTime(millis: Int) = copy(serverTimeAllowed = Some(millis))
 
     def allowedExecutionTime(duration: FiniteDuration) = duration.toMillis match {
@@ -168,6 +198,21 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         facetMinCount foreach (m ⇒ solrQuery.setFacetMinCount(m))
         facetPrefix foreach (p ⇒ solrQuery.setFacetPrefix(p))
 
+        groupField foreach(f => {
+            solrQuery.set(GroupParams.GROUP, true)
+            solrQuery.set(GroupParams.GROUP_FIELD, f)
+        })
+        if (!groupSortsList.isEmpty) {
+            val gSortArgs = for {
+                sc <- groupSortsList
+            } yield s"${sc.getItem} ${sc.getOrder}"
+            solrQuery.add(GroupParams.GROUP_SORT,gSortArgs mkString(","))
+        }
+        groupFormat foreach(f => solrQuery.set(GroupParams.GROUP_FORMAT, f))
+        groupMain foreach(m => solrQuery.set(GroupParams.GROUP_MAIN, m))
+        groupTotalCount foreach(n => solrQuery.set(GroupParams.GROUP_TOTAL_COUNT, n))
+        groupTruncate foreach(t => solrQuery.set(GroupParams.GROUP_TRUNCATE, t))
+
         ImmutableSolrParams(solrQuery)
     }
 }
@@ -192,8 +237,21 @@ object SolrQueryBuilder {
         def facetMinCount = Option(params.get(FacetParams.FACET_MINCOUNT)) map (_.toInt)
         def facetPrefix = Option(params.get(FacetParams.FACET_PREFIX))
 
+        def groupField = Option(params.get(GroupParams.GROUP_FIELD))
+        def groupSorts = Option(params.get(GroupParams.GROUP_SORT)) map { str =>
+            val sorts = str.split(",")
+            val scs = for {
+                s <- sorts
+            } yield SortClause.create(s.split(" ")(0), s.split(" ")(1))
+            scs.toVector
+        }
+        def groupFormat = Option(params.get(GroupParams.GROUP_FORMAT))
+        def groupMain = Option(params.get(GroupParams.GROUP_MAIN)) map (_.toBoolean)
+        def groupTotalCount = Option(params.get(GroupParams.GROUP_TOTAL_COUNT)) map (_.toBoolean)
+        def groupTruncate = Option(params.get(GroupParams.GROUP_TRUNCATE)) map (_.toBoolean)
+
         SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, facetLimit,
-            facetMinCount, facetPrefix, cursorMark)
+            facetMinCount, facetPrefix, cursorMark, groupField, groupSorts.getOrElse(Vector.empty), groupFormat, groupMain, groupTotalCount, groupTruncate)
     }
 
     /*

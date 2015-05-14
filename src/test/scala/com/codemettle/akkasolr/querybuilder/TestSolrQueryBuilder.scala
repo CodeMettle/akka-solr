@@ -66,7 +66,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     it should "add supported fields" in {
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
-            "testing" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
+            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
             "simple" groupInMain true groupFacetCounts true truncateGroupings true
 
         val sq = new SolrQuery("*")
@@ -80,6 +80,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetLimit(10)
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
+        sq.addFacetPivotField("f2,f1")
         sq.add(GroupParams.GROUP, "true")
         sq.add(GroupParams.GROUP_FIELD, "f1")
         sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
@@ -94,7 +95,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     it should "add supported fields with cursor" in {
         val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
-            "testing" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
+            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
             "simple" groupInMain true groupFacetCounts true truncateGroupings true
 
         val sq = new SolrQuery("*")
@@ -108,6 +109,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetLimit(10)
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
+        sq.addFacetPivotField("f2,f1")
         sq.add(GroupParams.GROUP, "true")
         sq.add(GroupParams.GROUP_FIELD, "f1")
         sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")

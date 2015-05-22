@@ -12,7 +12,7 @@ import java.{util => ju}
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
-import org.apache.solr.common.params.{GroupParams, FacetParams, SolrParams}
+import org.apache.solr.common.params.{StatsParams, GroupParams, FacetParams, SolrParams}
 
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
@@ -48,7 +48,8 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
                             cursorMarkOpt: Option[String] = None, groupField:Option[String] = None,
                             groupSortsList: Vector[SortClause] = Vector.empty, groupFormat:Option[String] = None,
                             groupMain:Option[Boolean] = None, groupTotalCount:Option[Boolean] = None,
-                            groupTruncate:Option[Boolean] = None) {
+                            groupTruncate:Option[Boolean] = None, statsFields: Vector[String] = Vector.empty,
+                            statsFacetFields: Vector[String] = Vector.empty) {
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -176,6 +177,22 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def truncateGroupings(tf:Boolean) = copy(groupTruncate = Some(tf))
 
+    def withStatsField(f: String) = if (statsFields.contains(f)) this else copy(statsFields = statsFields :+ f)
+
+    def withStatsFields(fs: Seq[String]) = (this /: fs) { case (sqc, f) ⇒ sqc withStatsField f }
+
+    def withoutStatsField(f: String) = if (statsFields.contains(f)) copy(statsFields = statsFields filterNot (_ == f)) else this
+
+    def withoutStatsFields(fs: Seq[String]) = (this /: fs) { case (sqc, f) ⇒ sqc withoutStatsField f }
+
+    def withStatsFacetField(f: String) = if (statsFacetFields.contains(f)) this else copy(statsFacetFields = statsFacetFields :+ f)
+
+    def withStatsFacetFields(fs: Seq[String]) = (this /: fs) { case (sqc, f) ⇒ sqc withStatsFacetField f }
+
+    def withoutStatsFacetField(f: String) = if (statsFacetFields.contains(f)) copy(statsFacetFields = statsFacetFields filterNot (_ == f)) else this
+
+    def withoutStatsFacetFields(fs: Seq[String]) = (this /: fs) { case (sqc, f) ⇒ sqc withoutStatsFacetField f }
+
     def allowedExecutionTime(millis: Int) = copy(serverTimeAllowed = Some(millis))
 
     def allowedExecutionTime(duration: FiniteDuration) = duration.toMillis match {
@@ -217,6 +234,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
             solrQuery.set(GroupParams.GROUP, true)
             solrQuery.set(GroupParams.GROUP_FIELD, f)
         })
+
         if (groupSortsList.nonEmpty) {
             val gSortArgs = for {
                 sc <- groupSortsList
@@ -227,6 +245,15 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         groupMain foreach(m => solrQuery.set(GroupParams.GROUP_MAIN, m))
         groupTotalCount foreach(n => solrQuery.set(GroupParams.GROUP_TOTAL_COUNT, n))
         groupTruncate foreach(t => solrQuery.set(GroupParams.GROUP_TRUNCATE, t))
+
+        if (statsFields.nonEmpty)
+            solrQuery.set(StatsParams.STATS, true)
+        statsFields foreach(f => {
+            solrQuery.add(StatsParams.STATS_FIELD, f)
+        })
+        statsFacetFields foreach(f => {
+            solrQuery.add(StatsParams.STATS_FACET, f)
+        })
 
         ImmutableSolrParams(solrQuery)
     }
@@ -268,9 +295,12 @@ object SolrQueryBuilder {
         def groupTotalCount = Option(params.get(GroupParams.GROUP_TOTAL_COUNT)) map (_.toBoolean)
         def groupTruncate = Option(params.get(GroupParams.GROUP_TRUNCATE)) map (_.toBoolean)
 
+        def statsFields = Option(params.getParams(StatsParams.STATS_FIELD)) map (_.toVector) getOrElse Vector.empty
+        def statsFacetFields = Option(params.getParams(StatsParams.STATS_FACET)) map (_.toVector) getOrElse Vector.empty
+
         SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, facetLimit,
             facetMinCount, facetPrefix, facetPivotFields, cursorMark, groupField, groupSorts, groupFormat, groupMain,
-            groupTotalCount, groupTruncate)
+            groupTotalCount, groupTruncate, statsFields, statsFacetFields)
     }
 
     /*

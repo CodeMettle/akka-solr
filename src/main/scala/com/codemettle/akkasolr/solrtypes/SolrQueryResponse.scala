@@ -7,10 +7,8 @@
  */
 package com.codemettle.akkasolr.solrtypes
 
-import org.apache.solr.client.solrj.response.QueryResponse
-
 import com.codemettle.akkasolr.Solr
-import org.apache.solr.common.params.FacetParams
+import org.apache.solr.client.solrj.response.QueryResponse
 
 import scala.collection.JavaConverters._
 
@@ -37,6 +35,9 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
 
     @transient
     lazy val facetPivotFields = Option(original.getFacetPivot)
+
+    @transient
+    lazy val fieldStatsInfo = Option(original.getFieldStatsInfo)
 
     @transient
     lazy val status = original.getStatus

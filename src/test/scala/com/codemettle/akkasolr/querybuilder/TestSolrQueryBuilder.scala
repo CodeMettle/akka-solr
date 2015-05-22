@@ -8,7 +8,7 @@
 package com.codemettle.akkasolr.querybuilder
 
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.common.params.{GroupParams, SolrParams}
+import org.apache.solr.common.params.{StatsParams, GroupParams, SolrParams}
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
@@ -67,7 +67,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
             "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
-            "simple" groupInMain true groupFacetCounts true truncateGroupings true
+            "simple" groupInMain true groupFacetCounts true truncateGroupings true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1")
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -88,6 +88,11 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.add(GroupParams.GROUP_MAIN, "true")
         sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
         sq.add(GroupParams.GROUP_TRUNCATE, "true")
+        sq.add(StatsParams.STATS, "true")
+        sq.add(StatsParams.STATS_FIELD, "f1")
+        sq.add(StatsParams.STATS_FIELD, "f2")
+        sq.add(StatsParams.STATS_FACET, "f2")
+        sq.add(StatsParams.STATS_FACET, "f1")
 
         checkEquals(sq, sqc)
     }
@@ -96,7 +101,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
             "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
-            "simple" groupInMain true groupFacetCounts true truncateGroupings true
+            "simple" groupInMain true groupFacetCounts true truncateGroupings true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1")
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -117,6 +122,11 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.add(GroupParams.GROUP_MAIN, "true")
         sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
         sq.add(GroupParams.GROUP_TRUNCATE, "true")
+        sq.add(StatsParams.STATS, "true")
+        sq.add(StatsParams.STATS_FIELD, "f1")
+        sq.add(StatsParams.STATS_FIELD, "f2")
+        sq.add(StatsParams.STATS_FACET, "f2")
+        sq.add(StatsParams.STATS_FACET, "f1")
 
         checkEquals(sq, sqc)
     }

@@ -40,6 +40,9 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
     lazy val fieldStatsInfo = Option(original.getFieldStatsInfo)
 
     @transient
+    lazy val groupResponse = original.getGroupResponse
+
+    @transient
     lazy val status = original.getStatus
 
     @transient

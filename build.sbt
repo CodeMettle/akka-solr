@@ -88,6 +88,15 @@ apiMappings ++= {
     )
 }
 
+// internal release
+
+//publishMavenStyle := true
+//
+//publishTo := Some(Resolver.ssh("CodeMettle Maven", "maven.codemettle.com",
+//    s"archiva/data/repositories/${if (isSnapshot.value) "snapshots" else "internal"}/") as
+//    ("archiva", Path.userHome / ".ssh" / "id_rsa"))
+
+
 // Release
 
 ReleaseKeys.crossBuild := true

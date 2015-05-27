@@ -2,7 +2,7 @@ akka-solr
 =========
 
 A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
-[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=master)](https://travis-ci.org/CodeMettle/akka-solr)
+[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/1.0)](https://travis-ci.org/CodeMettle/akka-solr)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11)
 
 The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
@@ -22,7 +22,7 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "1.0.0",
+    "com.codemettle.akka-solr" %% "akka-solr" % "1.0.1",
     "org.apache.solr" % "solr-solrj" % "4.5.1" // later versions should work but are untested
 )
 ```
@@ -33,7 +33,7 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
@@ -213,6 +213,8 @@ License
 Changelog
 ---------
 
+* **1.0.1**
+  * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
 * **1.0.0**
   * Update build to build against 2.10.5 and 2.11.6
   * No code changes, but the project has been in production long enough to mark it as 1.0.
@@ -248,3 +250,4 @@ Credits
 -------
 * Authored by [@codingismy11to7](https://github.com/codingismy11to7) for [@CodeMettle](https://github.com/CodeMettle)
   * We've used [@takezoe](https://github.com/takezoe)'s [solr-scala-client](https://github.com/takezoe/solr-scala-client) library extensively in production, and submitted features. akka-solr has no code from solr-scala-client, but there are some superficial similarities. It's a fine library if you need an asynchronous Solr client but don't use Akka.
+* Facet pivoting, stats, and grouping `SolrQueryBuilder` support by [@compfix](https://github.com/compfix)

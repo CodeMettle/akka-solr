@@ -217,6 +217,7 @@ Changelog
   * Drop support for Solr4, move to Solr 5.1
   * Drop support for Scala 2.10
   * Build with Java8
+  * **API Change:** change `isAnyOf` / `isNoneOf` to take iterables instead of being varargs methods (to cut down on `WrappedArray` bugs from forgetting `: _*` vararg conversions)
 * **1.0.1**
   * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
 * **1.0.0**

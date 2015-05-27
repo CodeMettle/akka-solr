@@ -66,8 +66,8 @@ object SolrQueryStringBuilder {
     case class FieldBuilder(field: Option[String]) {
         def :=(v: FieldValueType) = FieldValue(field, v)
         def :!=(v: FieldValueType) = Not(FieldValue(field, v))
-        def isAnyOf(vs: FieldValueType*) = if (vs.nonEmpty) IsAnyOf(field, vs) else Empty
-        def isNoneOf(vs: FieldValueType*) = if (vs.nonEmpty) Not(isAnyOf(vs: _*)) else Empty
+        def isAnyOf(vs: Iterable[FieldValueType]) = if (vs.nonEmpty) IsAnyOf(field, vs) else Empty
+        def isNoneOf(vs: Iterable[FieldValueType]) = if (vs.nonEmpty) Not(isAnyOf(vs)) else Empty
         def isInRange(lower: FieldValueType, upper: FieldValueType) = Range(field, lower, upper)
         def exists() = isInRange("*", "*")
         def doesNotExist() = Not(Range(field, "*", "*"))
@@ -83,7 +83,7 @@ object SolrQueryStringBuilder {
         def NOT(qp: QueryPart) = Not(qp)
 
         import scala.language.implicitConversions
-        implicit def queryPartToQueryBuilder(qp: QueryPart)(implicit arf: ActorRefFactory) = qp.queryOptions()
+        implicit def queryPartToQueryBuilder(qp: QueryPart)(implicit arf: ActorRefFactory): SolrQueryBuilder = qp.queryOptions()
     }
 
     object Methods extends BuilderMethods

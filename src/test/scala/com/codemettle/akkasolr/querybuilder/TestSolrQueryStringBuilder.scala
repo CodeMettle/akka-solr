@@ -90,7 +90,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         p3.render should equal ("id:1234")
 
-        val p4 = field("id") isAnyOf (1, 3, 5)
+        val p4 = field("id") isAnyOf Seq(1, 3, 5)
 
         p4.render should equal ("(id:1 OR id:3 OR id:5)")
 
@@ -107,7 +107,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         p6.render should equal ("(blah:2 AND -f2:ueo AND [* TO *])")
 
         val p7 = OR(
-            defaultField() isAnyOf (1, 2),
+            defaultField() isAnyOf Seq(1, 2),
             AND(
                 field("f") := 2,
                 field("g") doesNotExist()
@@ -120,7 +120,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
             field("f1") := 3,
             field("f2") :!= "x",
             OR(
-                defaultField() isAnyOf(1, 2),
+                defaultField() isAnyOf Seq(1, 2),
                 NOT(field("f3") := 4),
                 field("time") isInRange(3, 5)
             )
@@ -168,7 +168,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     "isAnyOf" should "be empty if no values supplied" in {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
-        val q = field("blah") isAnyOf (Nil: _*)
+        val q = field("blah") isAnyOf Nil
 
         q should equal (Empty)
     }
@@ -180,7 +180,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     "NOT" should "render correctly if empty" in {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
-        val qs = List(NOT(Empty), NOT(rawQuery("")), NOT(IsAnyOf(Some("blah"), Nil)), NOT(OR(Nil: _*)), NOT(AND(Nil: _*)), NOT(field("blah") isAnyOf(Nil: _*)))
+        val qs = List(NOT(Empty), NOT(rawQuery("")), NOT(IsAnyOf(Some("blah"), Nil)), NOT(OR(Nil: _*)), NOT(AND(Nil: _*)), NOT(field("blah") isAnyOf Nil))
 
         qs map (_.render) foreach (_ should equal (""))
     }
@@ -188,10 +188,10 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     "isNoneOf" should "render correctly" in {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
-        (defaultField() isNoneOf (1, 2, 3)).render should equal ("-(1 OR 2 OR 3)")
+        (defaultField() isNoneOf Seq(1, 2, 3)).render should equal ("-(1 OR 2 OR 3)")
 
-        (field("x") isNoneOf ("a", "b", "c")).render should equal ("-(x:a OR x:b OR x:c)")
+        (field("x") isNoneOf Seq("a", "b", "c")).render should equal ("-(x:a OR x:b OR x:c)")
 
-        (field("z") isNoneOf (Nil: _*)).render should be ('empty)
+        (field("z") isNoneOf Nil).render should be ('empty)
     }
 }

@@ -8,8 +8,8 @@
 package com.codemettle.akkasolr
 package client
 
-import org.apache.solr.client.solrj.SolrServer
-import org.apache.solr.client.solrj.request.{UpdateRequest, SolrPing}
+import org.apache.solr.client.solrj.SolrClient
+import org.apache.solr.client.solrj.request.{SolrPing, UpdateRequest}
 import org.apache.solr.common.util.NamedList
 
 import com.codemettle.akkasolr.client.SolrServerClientConnection.ReqHandler
@@ -26,11 +26,11 @@ import scala.concurrent.Future
  *
  */
 object SolrServerClientConnection {
-    def props(ss: SolrServer) = {
+    def props(ss: SolrClient) = {
         Props[SolrServerClientConnection](new SolrServerClientConnection(ss))
     }
 
-    private class ReqHandler(solrServer: SolrServer, req: Solr.SolrOperation, replyTo: ActorRef) extends Actor {
+    private class ReqHandler(solrServer: SolrClient, req: Solr.SolrOperation, replyTo: ActorRef) extends Actor {
         import context.dispatcher
 
         val timeout = actorSystem.scheduler.scheduleOnce(req.requestTimeout, self, 'timeout)
@@ -108,13 +108,13 @@ object SolrServerClientConnection {
     }
 }
 
-private[akkasolr] class SolrServerClientConnection(solrServer: SolrServer) extends Actor {
+private[akkasolr] class SolrServerClientConnection(solrServer: SolrClient) extends Actor {
     private val reqNamer = Util actorNamer "request"
 
     override def postStop() = {
         super.postStop()
 
-        solrServer.shutdown()
+        solrServer.close()
     }
 
     private def handleRequest(op: Solr.SolrOperation) = {

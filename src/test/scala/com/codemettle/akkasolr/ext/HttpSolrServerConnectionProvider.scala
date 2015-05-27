@@ -7,7 +7,7 @@
  */
 package com.codemettle.akkasolr.ext
 
-import org.apache.solr.client.solrj.impl.HttpSolrServer
+import org.apache.solr.client.solrj.impl.HttpSolrClient
 import spray.http.Uri
 
 import com.codemettle.akkasolr.client.SolrServerClientConnection
@@ -20,6 +20,6 @@ import akka.actor.{ExtendedActorSystem, Props}
  */
 class HttpSolrServerConnectionProvider extends ConnectionProvider {
     override def connectionActorProps(uri: Uri, system: ExtendedActorSystem): Props = {
-        SolrServerClientConnection props new HttpSolrServer(uri.toString())
+        SolrServerClientConnection props new HttpSolrClient(uri.toString())
     }
 }

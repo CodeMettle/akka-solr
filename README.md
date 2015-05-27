@@ -1,11 +1,11 @@
 akka-solr
 =========
 
-A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
-[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/1.0)](https://travis-ci.org/CodeMettle/akka-solr)
+A Solr5 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
+[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=master)](https://travis-ci.org/CodeMettle/akka-solr)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11)
 
-The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
+The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr5](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
 
 #### Note about blocking:
 In order to keep from reinventing the wheel and then maintaining said wheel, the SolrJ library is used for generating update (add/delete) requests (which could easily be replaced, and actually is buggy) and for parsing results (`XMLResponseParser`, `BinaryResponseParser`, `StreamingBinaryResponseParser`). Since the SolrJ `ResponseParser`s work from `java.io.InputSource`s, and akka-solr uses reactive/non-blocking response chunking, blocking calls were added to bridge the `InputSource` requests into Akka messages. A dedicated, runtime-configurable executor is used for all SolrJ response parsing with the `ActorInputStream` class and the `akkasolr.response-parser-dispatcher` config. Any improvements / alternate implementations are welcome. Along the same lines, SolrJ's `ZkStateReader` class is used for ZooKeeper/SolrCloud support, it has a configurable dispatcher that will be created upon first usage.
@@ -22,8 +22,8 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "1.0.1",
-    "org.apache.solr" % "solr-solrj" % "4.5.1" // later versions should work but are untested
+    "com.codemettle.akka-solr" %% "akka-solr" % "1.1.0",
+    "org.apache.solr" % "solr-solrj" % "5.1.0" // later versions should work but are untested
 )
 ```
 
@@ -33,12 +33,12 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
     <artifactId>solr-solrj</artifactId>
-    <version>4.5.1</version>
+    <version>5.1.0</version>
 </dependency>
 ```
 
@@ -213,6 +213,10 @@ License
 Changelog
 ---------
 
+* **1.1.0**
+  * Drop support for Solr4, move to Solr 5.1
+  * Drop support for Scala 2.10
+  * Build with Java8
 * **1.0.1**
   * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
 * **1.0.0**

@@ -8,12 +8,11 @@
 package com.codemettle
 
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.common.params.{SolrParams, CommonParams}
+import org.apache.solr.common.params.{CommonParams, SolrParams}
 import org.apache.solr.common.util.NamedList
 import spray.http.Uri
 
 import akka.actor.ActorRefFactory
-import scala.concurrent.duration.Duration
 
 /**
  * @author steven
@@ -53,14 +52,4 @@ package object akkasolr {
     implicit def nlToQueryResp(nl: NamedList[AnyRef]) = new QueryResponse(nl, null)
 
     def actorSystem(implicit arf: ActorRefFactory) = spray.util.actorSystem
-
-    // add this for 2.10 compilation
-    implicit class DurationWithCoarsest(val d: Duration) extends AnyVal {
-        def toCoarsest = d
-    }
-
-    // add this for 2.10 compilation
-    implicit class OptionWithContains[T](val o: Option[T]) extends AnyVal {
-        def contains(t: T) = o exists (_ == t)
-    }
 }

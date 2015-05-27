@@ -7,9 +7,9 @@
  */
 package com.codemettle.akkasolr.client.zk
 
-import java.{lang => jl, util => ju}
+import java.{lang ⇒ jl, util ⇒ ju}
 
-import org.apache.solr.client.solrj.impl.LBHttpSolrServer
+import org.apache.solr.client.solrj.impl.LBHttpSolrClient
 import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.cloud._
 import org.apache.solr.common.params.{ModifiableSolrParams, SolrParams, UpdateParams}
@@ -27,7 +27,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Random, Success, Try}
 
 /**
- * Translates ZooKeeper-specific code from [[org.apache.solr.client.solrj.impl.CloudSolrServer]]
+ * Translates ZooKeeper-specific code from [[org.apache.solr.client.solrj.impl.CloudSolrClient]]
  *
  * @author steven
  *
@@ -172,14 +172,14 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
     private def getRoutes(req: UpdateRequest, router: DocRouter, col: DocCollection,
                           urlMap: ju.Map[String, ju.List[String]],
                           routableParams: SolrParams): Try[Option[Map[String, LBClientConnection.ExtendedRequest]]] = {
-        def transformReq(req: LBHttpSolrServer.Req): LBClientConnection.ExtendedRequest = req.getRequest match {
+        def transformReq(req: LBHttpSolrClient.Req): LBClientConnection.ExtendedRequest = req.getRequest match {
             case ur: UpdateRequest ⇒
                 LBClientConnection.ExtendedRequest(Solr.SolrUpdateOperation(ur), req.getServers.asScala.toList)
 
             case _ ⇒ sys.error(s"${req.getRequest} isn't an UpdateRequest")
         }
 
-        def transformRoutes(routes: ju.Map[String, LBHttpSolrServer.Req]) = {
+        def transformRoutes(routes: ju.Map[String, LBHttpSolrClient.Req]) = {
             Option(routes) map (rs ⇒ (rs.asScala mapValues transformReq).toMap)
         }
 

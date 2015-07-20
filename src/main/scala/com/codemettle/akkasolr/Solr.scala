@@ -432,6 +432,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
                               requestTimeout: FiniteDuration)
 
     object RequestOptions extends SettingsCompanion[RequestOptions]("akkasolr.request-defaults") {
+        def materialize(implicit arf: ActorRefFactory) = apply(spray.util.actorSystem)
+
         override def fromSubConfig(c: Config): RequestOptions = {
             apply(
                 c getString "method" match {
@@ -460,6 +462,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
                              overwrite: Boolean)
 
     object UpdateOptions extends SettingsCompanion[UpdateOptions]("akkasolr.update-defaults") {
+        def materialize(implicit arf: ActorRefFactory) = apply(spray.util.actorSystem)
+
         override def fromSubConfig(c: Config): UpdateOptions = {
             import spray.util.pimpConfig
 
@@ -478,6 +482,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     case class LBConnectionOptions(aliveCheckInterval: FiniteDuration, nonStandardPingLimit: Int)
 
     object LBConnectionOptions extends SettingsCompanion[LBConnectionOptions]("akkasolr.load-balanced-connection-defaults") {
+        def materialize(implicit arf: ActorRefFactory) = apply(spray.util.actorSystem)
+
         override def fromSubConfig(c: Config): LBConnectionOptions = {
             import spray.util.pimpConfig
 
@@ -511,6 +517,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     }
 
     object SolrCloudConnectionOptions extends SettingsCompanion[SolrCloudConnectionOptions]("akkasolr.solrcloud-connection-defaults") {
+        def materialize(implicit arf: ActorRefFactory) = apply(spray.util.actorSystem)
 
         override def fromSubConfig(c: Config): SolrCloudConnectionOptions = {
             import spray.util.pimpConfig

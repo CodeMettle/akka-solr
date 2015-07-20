@@ -215,6 +215,8 @@ Changelog
 
 * **1.0.1**
   * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
+  * `isAnyOf` now generates more concise queries (`key:(v1 OR v2 OR v3)` vs `(key:v1 OR key:v2 OR key:v3)`)
+  * `Solr.(RequestOptions|UpdateOptions|LBConnectionOptions|SolrCloudConnectionOptions)` now all have a `.materialize(implicit ActorRefFactory)` method to create instances from the ether inside of any actor
 * **1.0.0**
   * Update build to build against 2.10.5 and 2.11.6
   * No code changes, but the project has been in production long enough to mark it as 1.0.

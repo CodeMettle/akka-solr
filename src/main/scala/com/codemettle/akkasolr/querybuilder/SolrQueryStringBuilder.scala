@@ -47,7 +47,7 @@ object SolrQueryStringBuilder {
             case IsAnyOf(field, values) ⇒
                 def valsToOr(vals: Iterable[FieldValueType]) = {
                     val prefix = field.fold("")(f ⇒ s"$f:")
-                    vals.mkString(s"$prefix(", " OR ", ")")
+                    vals.map(valueEsc).mkString(s"$prefix(", " OR ", ")")
                 }
                 if (values.isEmpty)
                     ""

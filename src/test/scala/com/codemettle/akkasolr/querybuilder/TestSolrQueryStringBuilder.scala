@@ -173,6 +173,14 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         q should equal (Empty)
     }
 
+    it should "handle spaces in items" in {
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+        val q = field("blah") isAnyOf ("a", "b b", "c", "d d d")
+
+        q.render should equal ("""blah:(a OR "b b" OR c OR "d d d")""")
+    }
+
     "IsAnyOf" should "render correctly if empty" in {
         IsAnyOf(Some("blah"), Nil).render should be ('empty)
     }

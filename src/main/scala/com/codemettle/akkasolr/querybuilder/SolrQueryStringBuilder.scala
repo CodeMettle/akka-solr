@@ -65,7 +65,7 @@ object SolrQueryStringBuilder {
         def isNoneOf(vs: FieldValueType*) = if (vs.nonEmpty) Not(isAnyOf(vs: _*)) else Empty
         def isInRange(lower: FieldValueType, upper: FieldValueType) = Range(field, lower, upper)
         def exists() = isInRange("*", "*")
-        def doesNotExist() = Not(Range(field, "*", "*"))
+        def doesNotExist() = Not(exists())
     }
 
     trait BuilderMethods {

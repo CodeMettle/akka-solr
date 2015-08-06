@@ -46,13 +46,8 @@ object SolrQueryStringBuilder {
             case AndQuery(parts) ⇒ andOrRender(parts, " AND ")
             case IsAnyOf(field, values) ⇒
                 def valsToOr(vals: Iterable[FieldValueType]) = {
-                    val fieldVals = {
-                        field match {
-                            case Some(f) ⇒ vals map (v ⇒ f + ':' + valueEsc(v))
-                            case None ⇒ vals map (v ⇒ valueEsc(v))
-                        }
-                    }
-                    fieldVals.mkString("(", " OR ", ")")
+                    val prefix = field.fold("")(f ⇒ s"$f:")
+                    vals.map(valueEsc).mkString(s"$prefix(", " OR ", ")")
                 }
                 if (values.isEmpty)
                     ""
@@ -70,7 +65,7 @@ object SolrQueryStringBuilder {
         def isNoneOf(vs: Iterable[FieldValueType]) = if (vs.nonEmpty) Not(isAnyOf(vs)) else Empty
         def isInRange(lower: FieldValueType, upper: FieldValueType) = Range(field, lower, upper)
         def exists() = isInRange("*", "*")
-        def doesNotExist() = Not(Range(field, "*", "*"))
+        def doesNotExist() = Not(exists())
     }
 
     trait BuilderMethods {

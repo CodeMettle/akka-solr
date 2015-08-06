@@ -49,7 +49,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
             )
         ))
 
-        parts2.render should equal ("((any:1 OR any:2) AND -(f:v OR f2:v2))")
+        parts2.render should equal ("(any:(1 OR 2) AND -(f:v OR f2:v2))")
 
         val parts3 = AndQuery(Seq(
             Not(
@@ -64,7 +64,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
             )
         ))
 
-        parts3.render should equal ("(-(any:1 OR any:2) AND -(f:v OR f2:v2))")
+        parts3.render should equal ("(-any:(1 OR 2) AND -(f:v OR f2:v2))")
     }
 
     it should "split IsAnyOf requests if they are too large" in {
@@ -72,7 +72,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         parts.render shouldBe a[String]
 
-        parts.copy(values = 0 :: parts.values.toList).render should equal ("((f:0 OR f:1 OR f:2 OR f:3 OR f:4) OR (f:5))")
+        parts.copy(values = 0 :: parts.values.toList).render should equal ("(f:(0 OR 1 OR 2 OR 3 OR 4) OR f:(5))")
     }
 
     it should "have a working DSL" in {
@@ -92,7 +92,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         val p4 = field("id") isAnyOf Seq(1, 3, 5)
 
-        p4.render should equal ("(id:1 OR id:3 OR id:5)")
+        p4.render should equal ("id:(1 OR 3 OR 5)")
 
         val p5 = field("date") isInRange (12345678, 12345679)
 
@@ -173,6 +173,14 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         q should equal (Empty)
     }
 
+    it should "handle spaces in items" in {
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+        val q = field("blah") isAnyOf Seq("a", "b b", "c", "d d d")
+
+        q.render should equal ("""blah:(a OR "b b" OR c OR "d d d")""")
+    }
+
     "IsAnyOf" should "render correctly if empty" in {
         IsAnyOf(Some("blah"), Nil).render should be ('empty)
     }
@@ -190,7 +198,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         (defaultField() isNoneOf Seq(1, 2, 3)).render should equal ("-(1 OR 2 OR 3)")
 
-        (field("x") isNoneOf Seq("a", "b", "c")).render should equal ("-(x:a OR x:b OR x:c)")
+        (field("x") isNoneOf Seq("a", "b", "c")).render should equal ("-x:(a OR b OR c)")
 
         (field("z") isNoneOf Nil).render should be ('empty)
     }

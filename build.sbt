@@ -31,6 +31,11 @@ pomExtra := {
             <email>steven@codemettle.com</email>
             <url>https://github.com/codingismy11to7/</url>
         </developer>
+        <developer>
+            <name>Cliff Ford</name>
+            <email>cliff@codemettle.com</email>
+            <url>https://github.com/compfix/</url>
+        </developer>
     </developers>
 }
 

@@ -107,4 +107,7 @@ object SolrQueryStringBuilder {
 
         case _ ⇒ value.toString
     }
+
+    import scala.language.implicitConversions
+    implicit def queryOpt2query[T <: QueryPart](qo: Option[T]): QueryPart = qo getOrElse Empty
 }

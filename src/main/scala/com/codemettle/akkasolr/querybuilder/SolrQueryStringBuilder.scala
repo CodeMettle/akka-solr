@@ -36,7 +36,7 @@ object SolrQueryStringBuilder {
             if (notStr.isEmpty) "" else s"-$notStr"
         }
 
-        def render(implicit arf: ActorRefFactory): String = this match {
+        def render(implicit arf: ActorRefFactory): String = this.simplify match {
             case Empty ⇒ ""
             case RawQuery(q) ⇒ q
             case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
@@ -55,6 +55,18 @@ object SolrQueryStringBuilder {
                     valsToOr(values)
                 else
                     ((values grouped Solr.Client.maxBooleanClauses) map valsToOr).mkString("(", " OR ", ")")
+        }
+
+        def simplify: QueryPart = this match {
+            case RawQuery(rq) if rq.isEmpty ⇒ Empty
+            case OrQuery(parts) ⇒
+                val newParts = parts.map(_.simplify).filterNot(_ eq Empty)
+                if (newParts.nonEmpty) OrQuery(newParts) else Empty
+            case AndQuery(parts) ⇒
+                val newParts = parts.map(_.simplify).filterNot(_ eq Empty)
+                if (newParts.nonEmpty) AndQuery(newParts) else Empty
+            case IsAnyOf(_, values) if values.isEmpty ⇒ Empty
+            case _ ⇒ this
         }
     }
 
@@ -107,4 +119,7 @@ object SolrQueryStringBuilder {
 
         case _ ⇒ value.toString
     }
+
+    import scala.language.implicitConversions
+    implicit def queryOpt2query[T <: QueryPart](qo: Option[T]): QueryPart = qo getOrElse Empty
 }

@@ -165,6 +165,56 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         q4.render should equal ("(* OR a:b)")
     }
 
+    "Options" should "render properly" in {
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+        val q = AND (
+            defaultField() := "*",
+            Option.empty[QueryPart],
+            Option(field("a") := "b")
+        )
+
+        q.render should equal ("(* AND a:b)")
+    }
+
+    "AND and OR queries" should "render correctly when nested" in {
+        import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+        val q = AND (
+            field("a") := "b",
+            field("n") := 5,
+            OR (
+                Option.empty[QueryPart],
+                Option(field("z") := "3"),
+                defaultField() := "*"
+            )
+        )
+
+        q.render should equal ("(a:b AND n:5 AND (z:3 OR *))")
+
+        val q2 = AND (
+            field("a") := "b",
+            field("n") := 5,
+            OR (
+                Seq.empty[QueryPart]: _*
+            )
+        )
+
+        q2.render should equal ("(a:b AND n:5)")
+
+        val q3 = AND (
+            field("a") := "b",
+            field("n") := 5,
+            OR (
+                Option.empty[QueryPart],
+                Empty,
+                Option.empty[RawQuery]
+            )
+        )
+
+        q3.render should equal ("(a:b AND n:5)")
+    }
+
     "isAnyOf" should "be empty if no values supplied" in {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 

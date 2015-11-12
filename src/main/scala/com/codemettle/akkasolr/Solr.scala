@@ -59,7 +59,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
      * @param op operation to run
      */
     @SerialVersionUID(1L)
-    case class Request(baseUri: String, op: SolrOperation) {
+    case class Request(baseUri: String, op: SolrOperation, username: Option[String] = None, password: Option[String] = None) {
         @transient
         val uri = Util normalize baseUri
     }

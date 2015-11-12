@@ -9,7 +9,7 @@ package com.codemettle.akkasolr
 package client
 
 import java.io.InputStream
-import java.{lang => jl}
+import java.{lang ⇒ jl}
 
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, StreamingBinaryResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
@@ -33,8 +33,9 @@ import scala.concurrent.duration.FiniteDuration
  *
  */
 object RequestHandler {
-    def props(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration) = {
-        Props[RequestHandler](new RequestHandler(baseUri, host, replyTo, request, timeout))
+    def props(baseUri: Uri, username: Option[String], password: Option[String], host: ActorRef, replyTo: ActorRef,
+              request: SolrOperation, timeout: FiniteDuration) = {
+        Props(new RequestHandler(baseUri, username, password, host, replyTo, request, timeout))
     }
 
     private type RespParserRetval = Either[String, (ResponseParser, HttpCharset)]
@@ -43,7 +44,8 @@ object RequestHandler {
     private case class Parsed(result: NamedList[AnyRef])
 }
 
-class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)
+class RequestHandler(baseUri: Uri, username: Option[String], password: Option[String], host: ActorRef,
+                     replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)
     extends Actor with ActorLogging {
     class StreamCallback extends StreamingResponseCallback {
         override def streamSolrDocument(doc: SolrDocument): Unit = {
@@ -71,9 +73,15 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
     override def preStart() = {
         super.preStart()
 
+        def authenticate(req: HttpRequest) = {
+            def credsOpt = for (u ← username; p ← password) yield BasicHttpCredentials(u, p)
+            def headerOpt = credsOpt map (HttpHeaders.Authorization(_))
+            headerOpt.fold(req)(head ⇒ req.mapHeaders(head :: _))
+        }
+
         checkCreateHttpRequest match {
             case Left(err) ⇒ sendError(Solr.InvalidRequest(err))
-            case Right(req) ⇒ host ! req
+            case Right(req) ⇒ host ! authenticate(req)
         }
     }
 
@@ -96,6 +104,7 @@ class RequestHandler(baseUri: Uri, host: ActorRef, replyTo: ActorRef, request: S
                 self ! PoisonPill
             else {
                 import context.dispatcher
+
                 import scala.concurrent.duration._
 
                 shutdownTimer = Some(actorSystem.scheduler.scheduleOnce(1.second, self, PoisonPill))

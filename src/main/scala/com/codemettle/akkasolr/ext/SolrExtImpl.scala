@@ -56,11 +56,12 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
         }
     }
 
-    def connectionActorProps(uri: Uri) = connectionProvider.connectionActorProps(uri, eas)
+    def connectionActorProps(uri: Uri, username: Option[String] = None, password: Option[String] = None) =
+        connectionProvider.connectionActorProps(uri, username, password, eas)
 
-    private def managerMessageForUrl(solrUrl: String) = {
+    private def managerMessageForUrl(solrUrl: String, user: Option[String], pass: Option[String]) = {
         zkRe findFirstIn solrUrl match {
-            case None ⇒ Manager.Messages.ClientTo(Util normalize solrUrl, solrUrl)
+            case None ⇒ Manager.Messages.ClientTo(Util normalize solrUrl, solrUrl, user, pass)
             case Some(_) ⇒
                 // not letting the user customize the options...they could send a SolrCloudClientTo message manually,
                 // or maybe i'll add another method
@@ -96,8 +97,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return Unit; sends a [[Solr.SolrConnection]] message to `requestor`. A `spray.can.Http.ConnectionException`
      *         wrapped in a [[akka.actor.Status.Failure]] may be raised by Spray and sent to `requestor`.
      */
-    def clientTo(solrUrl: String)(implicit requestor: ActorRef) = {
-        manager.tell(managerMessageForUrl(solrUrl), requestor)
+    def clientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit requestor: ActorRef) = {
+        manager.tell(managerMessageForUrl(solrUrl, username, password), requestor)
     }
 
     /**
@@ -106,12 +107,12 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @see [[SolrExtImpl.clientTo]]
      * @return a Future containing the [[com.codemettle.akkasolr.client.ClientConnection]]'s [[ActorRef]]
      */
-    def clientFutureTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ActorRef] = {
+    def clientFutureTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit exeCtx: ExecutionContext): Future[ActorRef] = {
         import akka.pattern.ask
         import scala.concurrent.duration._
         implicit val timeout = Timeout(10.seconds)
 
-        (manager ? managerMessageForUrl(solrUrl)).mapTo[Solr.SolrConnection] transform (_.connection, {
+        (manager ? managerMessageForUrl(solrUrl, username, password)).mapTo[Solr.SolrConnection] transform (_.connection, {
             case _: AskTimeoutException ⇒ new Exception("Unknown error, no response from Solr Manager")
             case t ⇒ t
         })
@@ -124,8 +125,8 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return a [[Future]] containing an [[com.codemettle.akkasolr.imperative.ImperativeWrapper]] around the
      *         akka-solr client connection
      */
-    def imperativeClientTo(solrUrl: String)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
-        clientFutureTo(solrUrl) map (a ⇒ ImperativeWrapper(a)(eas))
+    def imperativeClientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
+        clientFutureTo(solrUrl, username, password) map (a ⇒ ImperativeWrapper(a)(eas))
     }
 
     /**

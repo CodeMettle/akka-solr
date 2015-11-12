@@ -16,5 +16,5 @@ import akka.actor.{ExtendedActorSystem, Props}
  *
  */
 trait ConnectionProvider {
-    def connectionActorProps(uri: Uri, system: ExtendedActorSystem): Props
+    def connectionActorProps(uri: Uri, username: Option[String], password: Option[String], system: ExtendedActorSystem): Props
 }

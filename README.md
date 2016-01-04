@@ -2,7 +2,7 @@ akka-solr
 =========
 
 A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
-[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/1.0)](https://travis-ci.org/CodeMettle/akka-solr)
+[![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/1.5)](https://travis-ci.org/CodeMettle/akka-solr)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11)
 
 The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
@@ -22,7 +22,7 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "1.0.1",
+    "com.codemettle.akka-solr" %% "akka-solr" % "1.5.0",
     "org.apache.solr" % "solr-solrj" % "4.5.1" // later versions should work but are untested
 )
 ```
@@ -33,7 +33,7 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>1.0.1</version>
+    <version>1.5.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
@@ -233,6 +233,9 @@ License
 Changelog
 ---------
 
+* **1.5.0**
+  * Version change due to breaking API
+  * Add support for authentication on regular connections, although not supported (yet?) for LoadBalanced/SolrCloud connections
 * **1.0.1**
   * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
   * `isAnyOf` now generates more concise queries (`key:(v1 OR v2 OR v3)` vs `(key:v1 OR key:v2 OR key:v3)`)

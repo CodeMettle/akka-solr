@@ -1,6 +1,4 @@
 import SonatypeKeys._
-import sbtrelease.ReleaseStateTransformations._
-import sbtrelease.ReleaseStep
 
 // Metadata
 
@@ -104,23 +102,8 @@ apiMappings ++= {
 
 // Release
 
-ReleaseKeys.crossBuild := true
-
-ReleaseKeys.releaseProcess := Seq[ReleaseStep](
-    checkSnapshotDependencies,
-    inquireVersions,
-    runClean,
-    runTest,
-    setReleaseVersion,
-    commitReleaseVersion,
-    tagRelease,
-//    publishArtifacts,
-    setNextVersion,
-    commitNextVersion,
-    pushChanges
-)
-
-releaseSettings
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+releaseCrossBuild := true
 
 // Publish
 

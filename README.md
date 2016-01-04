@@ -3,7 +3,7 @@ akka-solr
 
 A Solr4 client built on [Akka](http://akka.io) and [Spray](http://spray.io)
 [![Build Status](https://travis-ci.org/CodeMettle/akka-solr.svg?branch=release/1.5)](https://travis-ci.org/CodeMettle/akka-solr)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.11)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.codemettle.akka-solr/akka-solr_2.10)
 
 The goal of akka-solr is to provide a high-performance, non-blocking, Akka-and-Scala-native interface to [Apache Solr4](http://lucene.apache.org/solr/). The initial implementation provides an interface similar to `spray-client`'s, with an Akka extension that allows requests to be sent to an actor, or an interface to request a connection actor and send requests to it. Optional builders for requests are provided, but are not required; results from Solr are returned as wrapper objects that provide easier access from Scala to SolrJ objects. Some SolrJ objects are used in the interest of maintainability.
 

@@ -22,7 +22,7 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "1.1.0",
+    "com.codemettle.akka-solr" %% "akka-solr" % "2.0.0",
     "org.apache.solr" % "solr-solrj" % "5.1.0" // later versions should work but are untested
 )
 ```
@@ -33,7 +33,7 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>1.1.0</version>
+    <version>2.0.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
@@ -58,6 +58,8 @@ A builder is provided as part of akka-solr, any improvements are welcome.
 
 #### Building Solr query strings
 
+###### Basic
+
 ```scala
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
@@ -70,6 +72,8 @@ val qs = field("mylong") isInRange (12345, 98765)
 val qs = field("requiredField") exists()
 val qs = field("illegalField") doesNotExist()
 ```
+
+###### AND/OR/NOT
 
 ```scala
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
@@ -85,6 +89,22 @@ val qs = AND (
     )
 )
 ```
+
+###### Options
+
+```scala
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
+
+// if both lower and upper are nonempty, then the "time" field will be in the query (Some(field("time").isInRange(lo, hi)))
+// if one or both are empty, then the for comprehension yields a None, and will be dropped at query render time
+def buildQuery(lower: Option[Long], upper: Option[Long]) = {
+  AND(
+    defaultField() := "xyz",
+    for (lo <- lower; hi <- upper) yield field("time") isInRange (lo, hi)
+  )
+}
+```
+
 
 #### Building queries with options
 
@@ -213,15 +233,20 @@ License
 Changelog
 ---------
 
-* **1.1.0**
+* **2.0.0**
   * Drop support for Solr4, move to Solr 5.1
   * Drop support for Scala 2.10
   * Build with Java8
   * **API Change:** change `isAnyOf` / `isNoneOf` to take iterables instead of being varargs methods (to cut down on `WrappedArray` bugs from forgetting `: _*` vararg conversions)
+* **1.5.0**
+  * Version change due to breaking API
+  * Add support for authentication on regular connections, although not supported (yet?) for LoadBalanced/SolrCloud connections
 * **1.0.1**
   * `SolrQueryBuilder` now supports facet pivots, stats, and grouping
   * `isAnyOf` now generates more concise queries (`key:(v1 OR v2 OR v3)` vs `(key:v1 OR key:v2 OR key:v3)`)
   * `Solr.(RequestOptions|UpdateOptions|LBConnectionOptions|SolrCloudConnectionOptions)` now all have a `.materialize(implicit ActorRefFactory)` method to create instances from the ether inside of any actor
+  * `SolrQueryStringBuilder` now has an implicit conversion from `Option[QueryPart]`s to `QueryPart`s
+  * Bug Fix - nested AND/ORs:a query like `AND(defaultField() := "*", OR(Seq.empty[QueryPart]: _*))` would generate `(* AND )`, now correctly generates `*`
 * **1.0.0**
   * Update build to build against 2.10.5 and 2.11.6
   * No code changes, but the project has been in production long enough to mark it as 1.0.

@@ -27,8 +27,8 @@ import scala.concurrent.duration._
  *
  */
 private[akkasolr] object ClientConnection {
-    def props(uri: Uri) = {
-        Props[ClientConnection](new ClientConnection(uri))
+    def props(uri: Uri, username: Option[String], password: Option[String]) = {
+        Props[ClientConnection](new ClientConnection(uri, username, password))
     }
 
     object fsm {
@@ -42,7 +42,9 @@ private[akkasolr] object ClientConnection {
     }
 }
 
-private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fsm.CCData] with ActorLogging {
+private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String], password: Option[String])
+    extends FSM[fsm.State, fsm.CCData] with ActorLogging {
+
     startWith(fsm.Disconnected, fsm.CCData())
 
     private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
@@ -64,7 +66,8 @@ private[akkasolr] class ClientConnection(baseUri: Uri) extends FSM[fsm.State, fs
 
     private def serviceRequest(hostConn: ActorRef, request: SolrOperation, requestor: ActorRef,
                                timeout: FiniteDuration) = {
-        context.actorOf(RequestHandler.props(baseUri, hostConn, requestor, request, timeout), actorName.next())
+        def props = RequestHandler.props(baseUri, username, password, hostConn, requestor, request, timeout)
+        context.actorOf(props, actorName.next())
     }
 
     private def pingServer(hostConn: ActorRef) = {

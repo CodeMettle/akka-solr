@@ -18,5 +18,6 @@ import akka.actor.ExtendedActorSystem
  *
  */
 class DefaultConnectionProvider extends ConnectionProvider {
-    override def connectionActorProps(uri: Uri, system: ExtendedActorSystem) = ClientConnection props uri
+    override def connectionActorProps(uri: Uri, username: Option[String], password: Option[String],
+                                      system: ExtendedActorSystem) = ClientConnection.props(uri, username, password)
 }

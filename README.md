@@ -67,7 +67,7 @@ val qs = rawQuery("my custom query")
 val qs = defaultField() := "wantthis"
 val qs = defaultField() :!= "dontwantthis"
 val qs = field("myfield") := "requiredvalue"
-val qs = field("myfield") isAnyOf ("1", "2")
+val qs = field("myfield") isAnyOf Seq("1", "2")
 val qs = field("mylong") isInRange (12345, 98765)
 val qs = field("requiredField") exists()
 val qs = field("illegalField") doesNotExist()
@@ -85,7 +85,7 @@ val qs = AND (
     OR (
         rawQuery ("<my custom query>"),
         field("aa") := "2",
-        field("bb") isAnyOf ("1", "2")
+        field("bb") isAnyOf Seq("1", "2")
     )
 )
 ```

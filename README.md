@@ -233,6 +233,9 @@ License
 Changelog
 ---------
 
+* **1.5.1**
+  * Add support to `SolrQueryBuilder` for shards
+  * Changed `SolrQueryBuilder` around as its fields were getting out of control, left the API intact, but this could affect users in rare cases - not enough of an issue to bump the minor version number.
 * **1.5.0**
   * Version change due to breaking API
   * Add support for authentication on regular connections, although not supported (yet?) for LoadBalanced/SolrCloud connections

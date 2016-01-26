@@ -62,7 +62,6 @@ object ActorInputStream {
 class ActorInputStream(implicit arf: ActorRefFactory) extends InputStream {
     private implicit val timeout = Timeout(90.seconds)
     private val buffer = arf.actorOf(Props[ByteBuffer])
-    private val log = akka.event.Logging.getLogger(actorSystem, this)
 
     def streamFinished() = buffer ! TriggerStreamComplete
 
@@ -76,7 +75,6 @@ class ActorInputStream(implicit arf: ActorRefFactory) extends InputStream {
     }
 
     override def read(b: Array[Byte], off: Int, len: Int): Int = {
-//        log.debug("reading {} bytes", len)
         if (b == null)
             throw new NullPointerException
         else if (off < 0 || len < 0 || len > b.length - off)
@@ -87,7 +85,6 @@ class ActorInputStream(implicit arf: ActorRefFactory) extends InputStream {
             Await.result(buffer ? DequeueBytes(len), Duration.Inf) match {
                 case DequeuedBytes(None) ⇒ -1
                 case DequeuedBytes(Some(byteStr)) ⇒
-//                    log.debug("got {} bytes", byteStr.size)
                     val bytes = byteStr.toArray
                     Platform.arraycopy(bytes, 0, b, off, bytes.length)
                     bytes.length

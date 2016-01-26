@@ -8,14 +8,15 @@
 package com.codemettle.akkasolr
 package querybuilder
 
-import java.{util => ju}
+import java.{util ⇒ ju}
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
-import org.apache.solr.common.params.{StatsParams, GroupParams, FacetParams, SolrParams}
+import org.apache.solr.common.params.{FacetParams ⇒ SolrFacetParams, GroupParams ⇒ SolrGroupParams, ShardParams,
+SolrParams, StatsParams}
 
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
-import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{RawQuery, QueryPart}
+import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.{QueryPart, RawQuery}
 
 import akka.actor.ActorRefFactory
 import scala.collection.JavaConverters._
@@ -40,16 +41,80 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
  * @author steven
  */
 @SerialVersionUID(1L)
+case class GroupParams(field: Option[String] = None, sortsList: Vector[SortClause] = Vector.empty,
+                       format: Option[String] = None, main: Option[Boolean] = None, totalCount: Option[Boolean] = None,
+                       truncate: Option[Boolean] = None, limit: Option[Int] = None) {
+    def withField(f: String) = if (field contains f) this else copy(field = Some(f))
+    def withoutField() = if (field.isEmpty) this else copy(field = None)
+
+    def sort(sorts: Iterable[SortClause]) = {
+        val vec = sorts.toVector
+        if (sortsList == vec) this else copy(sortsList = vec)
+    }
+    def withSort(sc: SortClause) = sortsList indexWhere (_.getItem == sc.getItem) match {
+        case idx if idx < 0 ⇒ copy(sortsList = sortsList :+ sc)
+        case idx ⇒ copy(sortsList = sortsList.updated(idx, sc))
+    }
+    def withSorts(scs: SortClause*) = (this /: scs) { case (gp, sc) ⇒ gp withSort sc }
+    def withoutSort(sc: SortClause) = if (sortsList contains sc) copy(sortsList = sortsList.filterNot(_ == sc)) else this
+    def withoutSorts() = if (sortsList.isEmpty) this else copy(sortsList = Vector.empty)
+
+    def withFormat(gf: String) = if (format contains gf) this else copy(format = Some(gf))
+    def withoutFormat() = if (format.isEmpty) this else copy(format = None)
+
+    def setMain(m: Boolean) = if (main contains m) this else copy(main = Some(m))
+    def setTotalCount(n: Boolean) = if (totalCount contains n) this else copy(totalCount = Some(n))
+    def setTruncate(t: Boolean) = if (truncate contains t) this else copy(truncate = Some(t))
+
+    def withLimit(lim: Int) = if (limit contains lim) this else copy(limit = Some(lim))
+    def withoutLimit() = if (limit.isEmpty) this else copy(limit = None)
+}
+
+@SerialVersionUID(1L)
+case class FacetParams(fields: Vector[String] = Vector.empty, limit: Option[Int] = None, minCount: Option[Int] = None,
+                       prefix: Option[String] = None, pivotFieldList: Vector[String] = Vector.empty) {
+    def setFields(fs: String*) = {
+        val vec = fs.toVector
+        if (fields == vec) this else copy(fields = vec)
+    }
+    def withField(f: String) = if (fields contains f) this else copy(fields = fields :+ f)
+    def withFields(fs: String*) = (this /: fs) { case (fp, f) ⇒ fp withField f }
+    def withoutField(f: String) = if (fields contains f) copy(fields = fields.filterNot(_ == f)) else this
+    def withoutFields(fs: String*) = (this /: fs) { case (fp, f) ⇒ fp withoutField f }
+    def withoutFields() = if (fields.isEmpty) this else copy(fields = Vector.empty)
+
+    def withLimit(lim: Int) = if (limit contains lim) this else copy(limit = Some(lim))
+    def withoutLimit() = if (limit.isEmpty) this else copy(limit = None)
+
+    def withMinCount(mc: Int) = if (minCount contains mc) this else copy(minCount = Some(mc))
+    def withoutMinCount() = if (minCount.isEmpty) this else copy(minCount = None)
+
+    def withPrefix(p: String) = if (prefix contains p) this else copy(prefix = Some(p))
+    def withoutPrefix() = if (prefix.isEmpty) this else copy(prefix = None)
+
+    def pivotFields(pfs: String*) = {
+        val vec = pfs.toVector
+        if (vec == pivotFieldList) this else copy(pivotFieldList = vec)
+    }
+    def withPivotField(f: String) = if (pivotFieldList contains f) this else copy(pivotFieldList = pivotFieldList :+ f)
+    def withPivotFields(fs: String*) = (this /: fs) { case (fp, f) ⇒ fp withPivotField f }
+    def withoutPivotField(f: String) = if (pivotFieldList contains f) copy(pivotFieldList = pivotFieldList.filterNot(_ == f)) else this
+    def withoutPivotFields(fs: String*) = (this /: fs) { case (fp, f) ⇒ fp withoutPivotField f }
+    def withoutPivotFields() = if (pivotFieldList.isEmpty) this else copy(pivotFieldList = Vector.empty)
+}
+
+@SerialVersionUID(2L)
 case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, startOpt: Option[Int] = None,
                             fieldList: Vector[String] = Vector.empty, sortsList: Vector[SortClause] = Vector.empty,
-                            facetFields: Vector[String] = Vector.empty, serverTimeAllowed: Option[Int] = None,
-                            facetLimit: Option[Int] = None, facetMinCount: Option[Int] = None,
-                            facetPrefix: Option[String] = None, facetPivotFields: Vector[String] = Vector.empty,
-                            cursorMarkOpt: Option[String] = None, groupField:Option[String] = None,
-                            groupSortsList: Vector[SortClause] = Vector.empty, groupFormat:Option[String] = None,
-                            groupMain:Option[Boolean] = None, groupTotalCount:Option[Boolean] = None,
-                            groupTruncate:Option[Boolean] = None, groupLimit:Option[Int] = None,
-                            statsFields: Vector[String] = Vector.empty, statsFacetFields: Vector[String] = Vector.empty) {
+                            serverTimeAllowed: Option[Int] = None, facetParams: FacetParams = FacetParams(),
+                            cursorMarkOpt: Option[String] = None, groupParams: GroupParams = GroupParams(),
+                            statsFields: Vector[String] = Vector.empty, statsFacetFields: Vector[String] = Vector.empty,
+                            shardList: Vector[String] = Vector.empty) {
+    private def copyIfChange[T](fieldVal: T, newFieldVal: (T) ⇒ T, copyIfChange: (T) ⇒ SolrQueryBuilder) = {
+        val newVal = newFieldVal(fieldVal)
+        if (newVal == fieldVal) this else copyIfChange(newVal)
+    }
+
     /* ** builder shortcuts ***/
 
     def withQuery(q: String) = copy(query = RawQuery(q))
@@ -114,72 +179,75 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withoutSorts() = if (sortsList.isEmpty) this else copy(sortsList = Vector.empty)
 
-    def facets(fs: String*) = copy(facetFields = fs.toVector)
+    private def facetParamsChange(change: (FacetParams) ⇒ FacetParams) =
+        copyIfChange[FacetParams](facetParams, change, fp ⇒ copy(facetParams = fp))
 
-    def withFacetField(f: String) = if (facetFields.contains(f)) this else copy(facetFields = facetFields :+ f)
+    def facets(fs: String*) = facetParamsChange(_.setFields(fs: _*))
 
-    def withFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withFacetField f }
+    def withFacetField(f: String) = facetParamsChange(_ withField f)
 
-    def withoutFacetField(f: String) = if (facetFields.contains(f)) copy(facetFields = facetFields filterNot (_ == f)) else this
+    def withFacetFields(fs: String*) = facetParamsChange(_.withFields(fs: _*))
 
-    def withoutFacetFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutFacetField f }
+    def withoutFacetField(f: String) = facetParamsChange(_ withoutField f)
 
-    def withoutFacetFields() = if (facetFields.isEmpty) this else copy(facetFields = Vector.empty)
+    def withoutFacetFields(fs: String*) = facetParamsChange(_.withoutFields(fs: _*))
 
-    def withFacetLimit(limit: Int) = if (facetLimit contains limit) this else copy(facetLimit = Some(limit))
+    def withoutFacetFields() = facetParamsChange(_.withoutFields())
 
-    def withoutFacetLimit() = if (facetLimit.isEmpty) this else copy(facetLimit = None)
+    def withFacetLimit(limit: Int) = facetParamsChange(_ withLimit limit)
 
-    def withFacetMinCount(min: Int) = if (facetMinCount contains min) this else copy(facetMinCount = Some(min))
+    def withoutFacetLimit() = facetParamsChange(_.withoutLimit())
 
-    def withoutFacetMinCount() = if (facetMinCount.isEmpty) this else copy(facetMinCount = None)
+    def withFacetMinCount(min: Int) = facetParamsChange(_ withMinCount min)
 
-    def withFacetPrefix(prefix: String) = if (facetPrefix contains prefix) this else copy(facetPrefix = Some(prefix))
+    def withoutFacetMinCount() = facetParamsChange(_.withoutMinCount())
 
-    def withoutFacetPrefix() = if (facetPrefix.isEmpty) this else copy(facetPrefix = None)
+    def withFacetPrefix(prefix: String) = facetParamsChange(_ withPrefix prefix)
 
-    def facetPivot(fs: String*) = copy(facetPivotFields = fs.toVector)
+    def withoutFacetPrefix() = facetParamsChange(_.withoutPrefix())
 
-    def withFacetPivotField(f: String) = if (facetPivotFields.contains(f)) this else copy(facetPivotFields = facetPivotFields :+ f)
+    def facetPivot(fs: String*) = facetParamsChange(_.pivotFields(fs: _*))
 
-    def withFacetPivotFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withFacetPivotField f }
+    def withFacetPivotField(f: String) = facetParamsChange(_ withPivotField f)
 
-    def withoutFacetPivotField(f: String) = if (facetPivotFields.contains(f)) copy(facetPivotFields = facetPivotFields filterNot (_ == f)) else this
+    def withFacetPivotFields(fs: String*) = facetParamsChange(_.withPivotFields(fs: _*))
 
-    def withoutFacetPivotFields(fs: String*) = (this /: fs) { case (sqc, f) ⇒ sqc withoutFacetField f }
+    def withoutFacetPivotField(f: String) = facetParamsChange(_ withoutPivotField f)
 
-    def withoutFacetPivotFields() = if (facetPivotFields.isEmpty) this else copy(facetPivotFields = Vector.empty)
+    def withoutFacetPivotFields(fs: String*) = facetParamsChange(_.withoutPivotFields(fs: _*))
 
-    def withGroupField(gf:String) = if (groupField.isDefined) this else copy(groupField = Some(gf))
+    def withoutFacetPivotFields() = facetParamsChange(_.withoutPivotFields())
 
-    def withoutGroupField() = if (groupField.isEmpty) this else copy(groupField = None)
+    private def groupParamsChange(change: (GroupParams) ⇒ GroupParams) =
+        copyIfChange[GroupParams](groupParams, change, gp ⇒ copy(groupParams = gp))
 
-    def groupSort(sc: SortClause) = copy(groupSortsList = Vector(sc))
+    def withGroupField(gf: String) = groupParamsChange(_ withField gf)
 
-    def withGroupSort(sc: SortClause) = groupSortsList indexWhere (_.getItem == sc.getItem) match {
-        case idx if idx < 0 ⇒ copy(groupSortsList = groupSortsList :+ sc)
-        case idx ⇒ copy(groupSortsList = groupSortsList updated (idx, sc))
-    }
+    def withoutGroupField() = groupParamsChange(_.withoutField())
 
-    def withGroupSorts(scs: SortClause*) = (this /: scs) { case (sqc, sc) ⇒ sqc withGroupSort sc }
+    def groupSort(sc: SortClause) = groupParamsChange(_ sort Iterable(sc))
 
-    def withoutGroupSort(sc: SortClause) = copy(groupSortsList = sortsList filterNot (_ == sc))
+    def withGroupSort(sc: SortClause) = groupParamsChange(_ withSort sc)
 
-    def withoutGroupSorts() = if (groupSortsList.isEmpty) this else copy(groupSortsList = Vector.empty)
+    def withGroupSorts(scs: SortClause*) = groupParamsChange(_.withSorts(scs: _*))
 
-    def withGroupFormat(gf:String) = if (groupFormat.isDefined) this else copy(groupFormat = Some(gf))
+    def withoutGroupSort(sc: SortClause) = groupParamsChange(_ withoutSort sc)
 
-    def withoutGroupFormat() = if (groupFormat.isEmpty) this else copy(groupFormat = None)
+    def withoutGroupSorts() = groupParamsChange(_.withoutSorts())
 
-    def groupInMain(tf: Boolean) = copy(groupMain = Some(tf))
+    def withGroupFormat(gf: String) = groupParamsChange(_ withFormat gf)
 
-    def groupFacetCounts(tf: Boolean) = copy(groupTotalCount = Some(tf))
+    def withoutGroupFormat() = groupParamsChange(_.withoutFormat())
 
-    def truncateGroupings(tf:Boolean) = copy(groupTruncate = Some(tf))
+    def groupInMain(tf: Boolean) = groupParamsChange(_ setMain tf)
 
-    def withGroupLimit(limit: Int) = if (groupLimit contains limit) this else copy(groupLimit = Some(limit))
+    def groupTotalCount(tf: Boolean) = groupParamsChange(_ setTotalCount tf)
 
-    def withoutGroupLimit() = if (groupLimit.isEmpty) this else copy(groupLimit = None)
+    def truncateGroupings(tf: Boolean) = groupParamsChange(_ setTruncate tf)
+
+    def withGroupLimit(limit: Int) = groupParamsChange(_ withLimit limit)
+
+    def withoutGroupLimit() = groupParamsChange(_.withoutLimit())
 
     def withStatsField(f: String) = if (statsFields.contains(f)) this else copy(statsFields = statsFields :+ f)
 
@@ -196,6 +264,21 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
     def withoutStatsFacetField(f: String) = if (statsFacetFields.contains(f)) copy(statsFacetFields = statsFacetFields filterNot (_ == f)) else this
 
     def withoutStatsFacetFields(fs: Seq[String]) = (this /: fs) { case (sqc, f) ⇒ sqc withoutStatsFacetField f }
+
+    def shards(ss: String*) = {
+        val vec = ss.toVector
+        if (shardList == vec) this else copy(shardList = vec)
+    }
+
+    def withShard(s: String) = if (shardList contains s) this else copy(shardList = shardList :+ s)
+
+    def withShards(ss: String*) = (this /: ss) { case (sqb, s) ⇒ sqb withShard s }
+
+    def withoutShard(s: String) = if (shardList contains s) copy(shardList = shardList.filterNot(_ == s)) else this
+
+    def withoutShards(ss: String*) = (this /: ss) { case (sqb, s) ⇒ sqb withoutShard s }
+
+    def withoutShards() = if (shardList.isEmpty) this else copy(shardList = Vector.empty)
 
     def allowedExecutionTime(millis: Int) = copy(serverTimeAllowed = Some(millis))
 
@@ -215,6 +298,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     /**
      * Create a [[SolrParams]] object that can be used for Solr queries
+ *
      * @return an [[ImmutableSolrParams]] representing the state of the builder
      */
     def toParams(implicit arf: ActorRefFactory): ImmutableSolrParams = {
@@ -225,31 +309,35 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
         cursorMarkOpt foreach (c ⇒ solrQuery.set(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark", c))
         solrQuery setFields (fieldList.toSeq: _*)
         sortsList foreach (s ⇒ solrQuery addSort s)
-        if (facetFields.nonEmpty)
-            solrQuery addFacetField (facetFields.toSeq: _*)
+        if (facetParams.fields.nonEmpty)
+            solrQuery.addFacetField(facetParams.fields.toSeq: _*)
         serverTimeAllowed foreach (ms ⇒ solrQuery setTimeAllowed ms)
-        facetLimit foreach (l ⇒ solrQuery.setFacetLimit(l))
-        facetMinCount foreach (m ⇒ solrQuery.setFacetMinCount(m))
-        facetPrefix foreach (p ⇒ solrQuery.setFacetPrefix(p))
-        if (facetPivotFields.nonEmpty)
-            solrQuery addFacetPivotField (facetPivotFields.toSeq: _*)
+        facetParams.limit.foreach(l ⇒ solrQuery.setFacetLimit(l))
+        facetParams.minCount.foreach(m ⇒ solrQuery.setFacetMinCount(m))
+        facetParams.prefix.foreach(p ⇒ solrQuery.setFacetPrefix(p))
+        if (facetParams.pivotFieldList.nonEmpty)
+            solrQuery.addFacetPivotField(facetParams.pivotFieldList.toSeq: _*)
 
-        groupField foreach(f => {
-            solrQuery.set(GroupParams.GROUP, true)
-            solrQuery.set(GroupParams.GROUP_FIELD, f)
-        })
-
-        if (groupSortsList.nonEmpty) {
-            val gSortArgs = for {
-                sc <- groupSortsList
-            } yield s"${sc.getItem} ${sc.getOrder}"
-            solrQuery.add(GroupParams.GROUP_SORT,gSortArgs mkString ",")
+        groupParams.field foreach { f ⇒
+            solrQuery.set(SolrGroupParams.GROUP, true)
+            solrQuery.set(SolrGroupParams.GROUP_FIELD, f)
         }
-        groupFormat foreach(f => solrQuery.set(GroupParams.GROUP_FORMAT, f))
-        groupMain foreach(m => solrQuery.set(GroupParams.GROUP_MAIN, m))
-        groupTotalCount foreach(n => solrQuery.set(GroupParams.GROUP_TOTAL_COUNT, n))
-        groupLimit foreach(n => solrQuery.set(GroupParams.GROUP_LIMIT, n))
-        groupTruncate foreach(t => solrQuery.set(GroupParams.GROUP_TRUNCATE, t))
+
+        if (groupParams.sortsList.nonEmpty) {
+            def gSortArgs = for {
+                sc ← groupParams.sortsList
+            } yield s"${sc.getItem} ${sc.getOrder}"
+
+            solrQuery.add(SolrGroupParams.GROUP_SORT, gSortArgs mkString ",")
+        }
+        groupParams.format.foreach(f ⇒ solrQuery.set(SolrGroupParams.GROUP_FORMAT, f))
+        groupParams.main.foreach(m ⇒ solrQuery.set(SolrGroupParams.GROUP_MAIN, m))
+        groupParams.totalCount.foreach(n ⇒ solrQuery.set(SolrGroupParams.GROUP_TOTAL_COUNT, n))
+        groupParams.limit.foreach(n ⇒ solrQuery.set(SolrGroupParams.GROUP_LIMIT, n))
+        groupParams.truncate.foreach(t ⇒ solrQuery.set(SolrGroupParams.GROUP_TRUNCATE, t))
+
+        if (shardList.nonEmpty)
+            solrQuery.set(ShardParams.SHARDS, shardList mkString ",")
 
         if (statsFields.nonEmpty)
             solrQuery.set(StatsParams.STATS, true)
@@ -272,6 +360,8 @@ object SolrQueryBuilder {
         def desc = descending
     }
 
+    private val sortRe = "(.*) (.*)".r
+
     def fromSolrQuery(params: SolrQuery) = {
         def rows = Option(params.getRows) map (_.intValue())
         def start = Option(params.getStart) map (_.intValue())
@@ -280,33 +370,33 @@ object SolrQueryBuilder {
         def sorts = params.getSorts.asScala.toVector
         def facetFields = Option(params.getFacetFields) map (_.toVector) getOrElse Vector.empty
         def exeTime = Option(params.getTimeAllowed) map (_.intValue())
-        def facetLimit = Option(params.get(FacetParams.FACET_LIMIT)) map (_.toInt)
-        def facetMinCount = Option(params.get(FacetParams.FACET_MINCOUNT)) map (_.toInt)
-        def facetPrefix = Option(params.get(FacetParams.FACET_PREFIX))
-        def facetPivotFields = Option(params.get(FacetParams.FACET_PIVOT)) map { str =>
+        def facetLimit = Option(params.get(SolrFacetParams.FACET_LIMIT)) map (_.toInt)
+        def facetMinCount = Option(params.get(SolrFacetParams.FACET_MINCOUNT)) map (_.toInt)
+        def facetPrefix = Option(params.get(SolrFacetParams.FACET_PREFIX))
+        def facetPivotFields = Option(params.get(SolrFacetParams.FACET_PIVOT)) map { str =>
             str.split(",").toVector
         } getOrElse Vector.empty
 
-        def groupField = Option(params.get(GroupParams.GROUP_FIELD))
-        def groupSorts = Option(params.get(GroupParams.GROUP_SORT)) map { str =>
-            val sorts = str.split(",")
-            val scs = for {
-                s <- sorts
-            } yield SortClause.create(s.split(" ")(0), s.split(" ")(1))
-            scs.toVector
+        def groupField = Option(params.get(SolrGroupParams.GROUP_FIELD))
+        def groupSorts = Option(params.get(SolrGroupParams.GROUP_SORT)) map { str =>
+            str.split(",").toVector collect {
+                case sortRe(i, o) ⇒ SortClause.create(i, o)
+            }
         } getOrElse Vector.empty
-        def groupFormat = Option(params.get(GroupParams.GROUP_FORMAT))
-        def groupMain = Option(params.get(GroupParams.GROUP_MAIN)) map (_.toBoolean)
-        def groupTotalCount = Option(params.get(GroupParams.GROUP_TOTAL_COUNT)) map (_.toBoolean)
-        def groupTruncate = Option(params.get(GroupParams.GROUP_TRUNCATE)) map (_.toBoolean)
-        def groupLimit = Option(params.get(GroupParams.GROUP_LIMIT)) map (_.toInt)
+        def groupFormat = Option(params.get(SolrGroupParams.GROUP_FORMAT))
+        def groupMain = Option(params.get(SolrGroupParams.GROUP_MAIN)) map (_.toBoolean)
+        def groupTotalCount = Option(params.get(SolrGroupParams.GROUP_TOTAL_COUNT)) map (_.toBoolean)
+        def groupTruncate = Option(params.get(SolrGroupParams.GROUP_TRUNCATE)) map (_.toBoolean)
+        def groupLimit = Option(params.get(SolrGroupParams.GROUP_LIMIT)) map (_.toInt)
 
         def statsFields = Option(params.getParams(StatsParams.STATS_FIELD)) map (_.toVector) getOrElse Vector.empty
         def statsFacetFields = Option(params.getParams(StatsParams.STATS_FACET)) map (_.toVector) getOrElse Vector.empty
 
-        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, facetFields, exeTime, facetLimit,
-            facetMinCount, facetPrefix, facetPivotFields, cursorMark, groupField, groupSorts, groupFormat, groupMain,
-            groupTotalCount, groupTruncate, groupLimit, statsFields, statsFacetFields)
+        def shards = Option(params.get(ShardParams.SHARDS)).map(_.split(",").toVector) getOrElse Vector.empty
+
+        SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, exeTime, FacetParams(facetFields, facetLimit,
+            facetMinCount, facetPrefix, facetPivotFields), cursorMark, GroupParams(groupField, groupSorts, groupFormat, groupMain,
+            groupTotalCount, groupTruncate, groupLimit), statsFields, statsFacetFields, shards)
     }
 
     /*

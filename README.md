@@ -233,11 +233,16 @@ License
 Changelog
 ---------
 
+* **2.0.1**
+  * Same changes as 1.5.1
 * **2.0.0**
   * Drop support for Solr4, move to Solr 5.1
   * Drop support for Scala 2.10
   * Build with Java8
   * **API Change:** change `isAnyOf` / `isNoneOf` to take iterables instead of being varargs methods (to cut down on `WrappedArray` bugs from forgetting `: _*` vararg conversions)
+* **1.5.1**
+  * Add support to `SolrQueryBuilder` for shards
+  * Changed `SolrQueryBuilder` around as its fields were getting out of control, left the API intact, but this could affect users in rare cases - not enough of an issue to bump the minor version number.
 * **1.5.0**
   * Version change due to breaking API
   * Add support for authentication on regular connections, although not supported (yet?) for LoadBalanced/SolrCloud connections

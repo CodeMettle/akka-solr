@@ -109,7 +109,7 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
                             serverTimeAllowed: Option[Int] = None, facetParams: FacetParams = FacetParams(),
                             cursorMarkOpt: Option[String] = None, groupParams: GroupParams = GroupParams(),
                             statsFields: Vector[String] = Vector.empty, statsFacetFields: Vector[String] = Vector.empty,
-                            shardList: Vector[String] = Vector.empty) {
+                            shardList: Vector[String] = Vector.empty, filterQueries: Vector[QueryPart] = Vector.empty) {
     private def copyIfChange[T](fieldVal: T, newFieldVal: (T) ⇒ T, copyIfChange: (T) ⇒ SolrQueryBuilder) = {
         val newVal = newFieldVal(fieldVal)
         if (newVal == fieldVal) this else copyIfChange(newVal)
@@ -119,7 +119,17 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
 
     def withQuery(q: String) = copy(query = RawQuery(q))
 
-    def withQuery(qp: QueryPart)(implicit arf: ActorRefFactory) = copy(query = qp)
+    def withQuery(qp: QueryPart) = copy(query = qp)
+
+    def withFilterQuery(q: String) = copy(filterQueries = filterQueries :+ RawQuery(q))
+
+    def withFilterQuery(qp: QueryPart) = copy(filterQueries = filterQueries :+ qp)
+
+    def withFilterQueries(qps: Iterable[QueryPart]) = copy(filterQueries = qps.toVector)
+
+    def withStringFilterQueries(qs: Iterable[String]) = withFilterQueries(qs map RawQuery)
+
+    def withoutFilterQueries() = if (filterQueries.isEmpty) this else copy(filterQueries = Vector.empty)
 
     def rows(r: Int) = copy(rowsOpt = Some(r))
 
@@ -348,6 +358,9 @@ case class SolrQueryBuilder(query: QueryPart, rowsOpt: Option[Int] = None, start
             solrQuery.add(StatsParams.STATS_FACET, f)
         })
 
+        if (filterQueries.nonEmpty)
+            solrQuery.setFilterQueries(filterQueries.map(_.render): _*)
+
         ImmutableSolrParams(solrQuery)
     }
 }
@@ -394,9 +407,11 @@ object SolrQueryBuilder {
 
         def shards = Option(params.get(ShardParams.SHARDS)).map(_.split(",").toVector) getOrElse Vector.empty
 
+        def filterQueries = Option(params.getFilterQueries).map(_.toVector.map(RawQuery)) getOrElse Vector.empty
+
         SolrQueryBuilder(RawQuery(params.getQuery), rows, start, fields, sorts, exeTime, FacetParams(facetFields, facetLimit,
             facetMinCount, facetPrefix, facetPivotFields), cursorMark, GroupParams(groupField, groupSorts, groupFormat, groupMain,
-            groupTotalCount, groupTruncate, groupLimit), statsFields, statsFacetFields, shards)
+            groupTotalCount, groupTruncate, groupLimit), statsFields, statsFacetFields, shards, filterQueries)
     }
 
     /*

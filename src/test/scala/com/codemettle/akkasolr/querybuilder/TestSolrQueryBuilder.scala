@@ -8,7 +8,7 @@
 package com.codemettle.akkasolr.querybuilder
 
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.common.params.{GroupParams ⇒ SolrGroupParams, ShardParams, StatsParams, SolrParams}
+import org.apache.solr.common.params.{GroupParams ⇒ SolrGroupParams, CommonParams, ShardParams, StatsParams, SolrParams}
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
@@ -64,12 +64,18 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     }
 
     it should "add supported fields" in {
+        def fq = {
+            import SolrQueryStringBuilder.Methods._
+
+            AND(defaultField() := "x", field("f3") isInRange (1, 5))
+        }
+
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
             "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts
             ("f1".asc, "f2".desc) withGroupFormat "simple" groupInMain true groupTotalCount true truncateGroupings
             true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1") withGroupLimit
-            100 withShards ("shard1", "shard2")
+            100 withShards ("shard1", "shard2") withFilterQuery "f1:v1" withFilterQuery fq
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -97,6 +103,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.add(StatsParams.STATS_FACET, "f2")
         sq.add(StatsParams.STATS_FACET, "f1")
         sq.set(ShardParams.SHARDS, "shard1,shard2")
+        sq.addFilterQuery("f1:v1", "(x AND f3:[1 TO 5])")
 
         checkEquals(sq, sqc)
     }
@@ -209,6 +216,24 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqb12 = sqb11 withoutShard "shard1"
 
         checkEquals(sq, sqb12)
+
+        sq.setFilterQueries("f:v", "f2:v2")
+        val sqb13 = {
+            import SolrQueryStringBuilder.Methods._
+            sqb12 withFilterQueries Seq(field("f") := "v", field("f2") := "v2")
+        }
+
+        checkEquals(sq, sqb13)
+
+        sq.addFilterQuery("z:3")
+        val sqb14 = sqb13 withFilterQuery "z:3"
+
+        checkEquals(sq, sqb14)
+
+        sq.remove(CommonParams.FQ)
+        val sqb15 = sqb14.withoutFilterQueries()
+
+        checkEquals(sq, sqb15)
     }
 
     it should "be creatable from a SolrQuery" in {
@@ -313,5 +338,17 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqb10 = SolrQueryBuilder.fromSolrQuery(q)
 
         sqb10.shardList should equal (Vector("shard1", "shard2", "shard3"))
+
+        q.addFilterQuery("f:v")
+
+        val sqb11 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb11.filterQueries should equal (Vector(RawQuery("f:v")))
+
+        q.addFilterQuery("(z:3 AND x:[1 TO 5])", "blegh:blah")
+
+        val sqb12 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb12.filterQueries should equal (Vector(RawQuery("f:v"), RawQuery("(z:3 AND x:[1 TO 5])"), RawQuery("blegh:blah")))
     }
 }

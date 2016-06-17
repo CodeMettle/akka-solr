@@ -469,7 +469,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
             apply(
                 c getBoolean "commit",
-                c getDuration "commit-within" match {
+                pimpConfig(c) getDuration "commit-within" match {
                     case fd: FiniteDuration ⇒ Some(fd)
                     case _ ⇒ None
                 },
@@ -488,7 +488,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             import spray.util.pimpConfig
 
             apply(
-                c getDuration "alive-check-interval" match {
+                pimpConfig(c) getDuration "alive-check-interval" match {
                     case fd: FiniteDuration ⇒ fd
                     case _ ⇒ 1.minute
                 },
@@ -523,11 +523,11 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             import spray.util.pimpConfig
 
             apply(
-                c getDuration "zookeeper-connect-timeout" match {
+                pimpConfig(c) getDuration "zookeeper-connect-timeout" match {
                     case fd: FiniteDuration ⇒ fd
                     case _ ⇒ 10.seconds
                 },
-                c getDuration "zookeeper-client-timeout" match {
+                pimpConfig(c) getDuration "zookeeper-client-timeout" match {
                     case fd: FiniteDuration ⇒ fd
                     case _ ⇒ 10.seconds
                 },

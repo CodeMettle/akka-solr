@@ -39,7 +39,7 @@ pomExtra := {
 
 // Build
 
-crossScalaVersions := Seq("2.11.6")
+crossScalaVersions := Seq("2.11.8")
 
 scalaVersion := crossScalaVersions.value.head
 

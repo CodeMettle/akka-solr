@@ -233,6 +233,8 @@ License
 Changelog
 ---------
 
+* **2.1.0**
+  * Upgrade Akka to 2.4
 * **2.0.1**
   * Same changes as 1.5.1
 * **2.0.0**

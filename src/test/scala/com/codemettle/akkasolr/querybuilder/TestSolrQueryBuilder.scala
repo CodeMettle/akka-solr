@@ -8,7 +8,7 @@
 package com.codemettle.akkasolr.querybuilder
 
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.common.params.{StatsParams, GroupParams, SolrParams}
+import org.apache.solr.common.params.{GroupParams ⇒ SolrGroupParams, CommonParams, ShardParams, StatsParams, SolrParams}
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
@@ -64,10 +64,18 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     }
 
     it should "add supported fields" in {
+        def fq = {
+            import SolrQueryStringBuilder.Methods._
+
+            AND(defaultField() := "x", field("f3") isInRange (1, 5))
+        }
+
         val sqc = Solr createQuery "*" rows 42 start 7 fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
-            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
-            "simple" groupInMain true groupFacetCounts true truncateGroupings true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1") withGroupLimit 100
+            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts
+            ("f1".asc, "f2".desc) withGroupFormat "simple" groupInMain true groupTotalCount true truncateGroupings
+            true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1") withGroupLimit
+            100 withShards ("shard1", "shard2") withFilterQuery "f1:v1" withFilterQuery fq
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -81,19 +89,21 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
         sq.addFacetPivotField("f2,f1")
-        sq.add(GroupParams.GROUP, "true")
-        sq.add(GroupParams.GROUP_FIELD, "f1")
-        sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
-        sq.add(GroupParams.GROUP_FORMAT, "simple")
-        sq.add(GroupParams.GROUP_MAIN, "true")
-        sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
-        sq.add(GroupParams.GROUP_TRUNCATE, "true")
-        sq.add(GroupParams.GROUP_LIMIT, "100")
+        sq.add(SolrGroupParams.GROUP, "true")
+        sq.add(SolrGroupParams.GROUP_FIELD, "f1")
+        sq.add(SolrGroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        sq.add(SolrGroupParams.GROUP_FORMAT, "simple")
+        sq.add(SolrGroupParams.GROUP_MAIN, "true")
+        sq.add(SolrGroupParams.GROUP_TOTAL_COUNT, "true")
+        sq.add(SolrGroupParams.GROUP_TRUNCATE, "true")
+        sq.add(SolrGroupParams.GROUP_LIMIT, "100")
         sq.add(StatsParams.STATS, "true")
         sq.add(StatsParams.STATS_FIELD, "f1")
         sq.add(StatsParams.STATS_FIELD, "f2")
         sq.add(StatsParams.STATS_FACET, "f2")
         sq.add(StatsParams.STATS_FACET, "f1")
+        sq.set(ShardParams.SHARDS, "shard1,shard2")
+        sq.addFilterQuery("f1:v1", "(x AND f3:[1 TO 5])")
 
         checkEquals(sq, sqc)
     }
@@ -101,8 +111,10 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     it should "add supported fields with cursor" in {
         val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
-            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts("f1".asc, "f2".desc) withGroupFormat
-            "simple" groupInMain true groupFacetCounts true truncateGroupings true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1") withGroupLimit 100
+            "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts
+            ("f1".asc, "f2".desc) withGroupFormat "simple" groupInMain true groupTotalCount true truncateGroupings
+            true withStatsFields Seq("f1","f2") withStatsFacetFields Seq("f2","f1") withGroupLimit
+            100 withShards ("shard1", "shard2")
 
         val sq = new SolrQuery("*")
         sq.setRows(42)
@@ -116,19 +128,20 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sq.setFacetMinCount(1)
         sq.setFacetPrefix("testing")
         sq.addFacetPivotField("f2,f1")
-        sq.add(GroupParams.GROUP, "true")
-        sq.add(GroupParams.GROUP_FIELD, "f1")
-        sq.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
-        sq.add(GroupParams.GROUP_FORMAT, "simple")
-        sq.add(GroupParams.GROUP_MAIN, "true")
-        sq.add(GroupParams.GROUP_TOTAL_COUNT, "true")
-        sq.add(GroupParams.GROUP_TRUNCATE, "true")
-        sq.add(GroupParams.GROUP_LIMIT, "100")
+        sq.add(SolrGroupParams.GROUP, "true")
+        sq.add(SolrGroupParams.GROUP_FIELD, "f1")
+        sq.add(SolrGroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        sq.add(SolrGroupParams.GROUP_FORMAT, "simple")
+        sq.add(SolrGroupParams.GROUP_MAIN, "true")
+        sq.add(SolrGroupParams.GROUP_TOTAL_COUNT, "true")
+        sq.add(SolrGroupParams.GROUP_TRUNCATE, "true")
+        sq.add(SolrGroupParams.GROUP_LIMIT, "100")
         sq.add(StatsParams.STATS, "true")
         sq.add(StatsParams.STATS_FIELD, "f1")
         sq.add(StatsParams.STATS_FIELD, "f2")
         sq.add(StatsParams.STATS_FACET, "f2")
         sq.add(StatsParams.STATS_FACET, "f1")
+        sq.add(ShardParams.SHARDS, "shard1,shard2")
 
         checkEquals(sq, sqc)
     }
@@ -193,6 +206,34 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqc10 = sqc9 allowedExecutionTime Duration.Undefined
 
         checkEquals(sq, sqc10)
+
+        sq.set(ShardParams.SHARDS, "shard1,shard2")
+        val sqb11 = sqc10 shards ("shard1", "shard2")
+
+        checkEquals(sq, sqb11)
+
+        sq.set(ShardParams.SHARDS, "shard2")
+        val sqb12 = sqb11 withoutShard "shard1"
+
+        checkEquals(sq, sqb12)
+
+        sq.setFilterQueries("f:v", "f2:v2")
+        val sqb13 = {
+            import SolrQueryStringBuilder.Methods._
+            sqb12 withFilterQueries Seq(field("f") := "v", field("f2") := "v2")
+        }
+
+        checkEquals(sq, sqb13)
+
+        sq.addFilterQuery("z:3")
+        val sqb14 = sqb13 withFilterQuery "z:3"
+
+        checkEquals(sq, sqb14)
+
+        sq.remove(CommonParams.FQ)
+        val sqb15 = sqb14.withoutFilterQueries()
+
+        checkEquals(sq, sqb15)
     }
 
     it should "be creatable from a SolrQuery" in {
@@ -205,17 +246,18 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb1.fieldList should be ('empty)
         sqb1.startOpt should be ('empty)
         sqb1.sortsList should be ('empty)
-        sqb1.facetFields should be ('empty)
+        sqb1.facetParams.fields should be ('empty)
         sqb1.serverTimeAllowed should be ('empty)
-        sqb1.facetLimit should be ('empty)
-        sqb1.facetMinCount should be ('empty)
-        sqb1.facetPrefix should be ('empty)
-        sqb1.groupField should be ('empty)
-        sqb1.groupSortsList should be ('empty)
-        sqb1.groupFormat should be ('empty)
-        sqb1.groupMain should be ('empty)
-        sqb1.groupTotalCount should be ('empty)
-        sqb1.groupTruncate should be ('empty)
+        sqb1.facetParams.limit should be ('empty)
+        sqb1.facetParams.minCount should be ('empty)
+        sqb1.facetParams.prefix should be ('empty)
+        sqb1.groupParams.field should be ('empty)
+        sqb1.groupParams.sortsList should be ('empty)
+        sqb1.groupParams.format should be ('empty)
+        sqb1.groupParams.main should be ('empty)
+        sqb1.groupParams.totalCount should be ('empty)
+        sqb1.groupParams.truncate should be ('empty)
+        sqb1.shardList should be ('empty)
 
         q setRows 10
 
@@ -246,7 +288,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
         val sqb6 = SolrQueryBuilder.fromSolrQuery(q)
 
-        sqb6.facetFields should equal (Vector("a", "b"))
+        sqb6.facetParams.fields should equal (Vector("a", "b"))
 
         q.setTimeAllowed(5000)
         q.setFacetLimit(42)
@@ -260,11 +302,11 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb7.fieldList should equal (Vector("a", "b"))
         sqb7.startOpt.value should equal (25)
         sqb7.sortsList should equal (Vector("a".ascending, "b".descending))
-        sqb7.facetFields should equal (Vector("a", "b"))
         sqb7.serverTimeAllowed.value should equal (5000)
-        sqb7.facetLimit.value should equal (42)
-        sqb7.facetMinCount.value should equal (12)
-        sqb7.facetPrefix.value should equal ("fp")
+        sqb7.facetParams.fields should equal (Vector("a", "b"))
+        sqb7.facetParams.limit.value should equal (42)
+        sqb7.facetParams.minCount.value should equal (12)
+        sqb7.facetParams.prefix.value should equal ("fp")
 
         q.setStart(null)
         q.set(/*CursorMarkParams.CURSOR_MARK_PARAM*/"cursorMark", "abc")
@@ -274,21 +316,39 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         sqb8.startOpt should be ('empty)
         sqb8.cursorMarkOpt.value should equal ("abc")
 
-        q.add(GroupParams.GROUP, "true")
-        q.add(GroupParams.GROUP_FIELD, "f1")
-        q.add(GroupParams.GROUP_SORT, "f1 asc,f2 desc")
-        q.add(GroupParams.GROUP_FORMAT, "simple")
-        q.add(GroupParams.GROUP_MAIN, "true")
-        q.add(GroupParams.GROUP_TOTAL_COUNT, "true")
-        q.add(GroupParams.GROUP_TRUNCATE, "true")
+        q.add(SolrGroupParams.GROUP, "true")
+        q.add(SolrGroupParams.GROUP_FIELD, "f1")
+        q.add(SolrGroupParams.GROUP_SORT, "f1 asc,f2 desc")
+        q.add(SolrGroupParams.GROUP_FORMAT, "simple")
+        q.add(SolrGroupParams.GROUP_MAIN, "true")
+        q.add(SolrGroupParams.GROUP_TOTAL_COUNT, "true")
+        q.add(SolrGroupParams.GROUP_TRUNCATE, "true")
 
         val sqb9 = SolrQueryBuilder.fromSolrQuery(q)
 
-        sqb9.groupField.value should equal("f1")
-        sqb9.groupSortsList should equal(Vector("f1".asc, "f2".descending))
-        sqb9.groupFormat.value should equal("simple")
-        sqb9.groupMain.value should equal(true)
-        sqb9.groupTotalCount.value should equal(true)
-        sqb9.groupTruncate.value should equal(true)
+        sqb9.groupParams.field.value should equal("f1")
+        sqb9.groupParams.sortsList should equal(Vector("f1".asc, "f2".descending))
+        sqb9.groupParams.format.value should equal("simple")
+        sqb9.groupParams.main.value should equal(true)
+        sqb9.groupParams.totalCount.value should equal(true)
+        sqb9.groupParams.truncate.value should equal(true)
+
+        q.set(ShardParams.SHARDS, "shard1,shard2,shard3")
+
+        val sqb10 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb10.shardList should equal (Vector("shard1", "shard2", "shard3"))
+
+        q.addFilterQuery("f:v")
+
+        val sqb11 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb11.filterQueries should equal (Vector(RawQuery("f:v")))
+
+        q.addFilterQuery("(z:3 AND x:[1 TO 5])", "blegh:blah")
+
+        val sqb12 = SolrQueryBuilder.fromSolrQuery(q)
+
+        sqb12.filterQueries should equal (Vector(RawQuery("f:v"), RawQuery("(z:3 AND x:[1 TO 5])"), RawQuery("blegh:blah")))
     }
 }

@@ -13,5 +13,5 @@ object Versions {
     val logback = "1.1.2"
     val scalaTest = "3.0.3"
     val slf4j = "1.7.7"
-    val solr = "5.1.0"
+    val solr = "6.1.0"
 }

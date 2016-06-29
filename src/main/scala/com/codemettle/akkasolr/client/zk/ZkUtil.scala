@@ -24,7 +24,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Random, Success, Try}
 
 /**
- * Translates ZooKeeper-specific code from [[org.apache.solr.client.solrj.impl.CloudSolrServer]]
+ * Translates ZooKeeper-specific code from [[org.apache.solr.client.solrj.impl.CloudSolrClient]]
  *
  * @author steven
  *
@@ -33,7 +33,7 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
     private def getCollectionSet(reader: ZkStateReader, clusterState: ClusterState,
                                  collection: String): Try[Set[String]] = {
         def collectionsForCollectionName(collectionName: String): Try[Set[String]] = {
-            if (clusterState.getCollections contains collectionName)
+            if (clusterState.getCollectionsMap.asScala contains collectionName)
                 Success(Set(collectionName))
             else Option(reader.getAliases getCollectionAlias collectionName) match {
                 case None ⇒ Failure(Solr.InvalidRequest(s"Collection not found: $collectionName"))
@@ -125,7 +125,8 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
                     case ((leaderAcc, replicaAcc, nodesAcc), replica) ⇒
                         val coreNodeProps = new ZkCoreNodeProps(replica)
                         val node = coreNodeProps.getNodeName
-                        if (!(liveNodes contains node) || (coreNodeProps.getState != ZkStateReader.ACTIVE) ||
+                        if (!(liveNodes contains node) ||
+                            (Replica.State.getState(coreNodeProps.getState) != Replica.State.ACTIVE) ||
                             nodesAcc(node)) {
                             (leaderAcc, replicaAcc, nodesAcc)
                         } else {

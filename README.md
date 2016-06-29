@@ -233,6 +233,8 @@ License
 Changelog
 ---------
 
+* **3.0.0**
+  * Upgrade SolrJ to version 6.1
 * **2.1.0**
   * Upgrade Akka to 2.4
 * **2.0.1**

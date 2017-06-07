@@ -70,7 +70,7 @@ object Example extends App {
     private class WD extends Actor {
         context watch main
         def receive = {
-            case Terminated(`main`) ⇒ system.shutdown()
+            case Terminated(`main`) ⇒ system.terminate()
         }
     }
 }

@@ -7,11 +7,11 @@
  */
 package com.codemettle.akkasolr.solrtypes
 
-import java.{lang => jl}
+import java.{lang ⇒ jl}
 
 import org.apache.solr.common.util.NamedList
-import spray.http.Uri
 
+import akka.http.scaladsl.model.Uri
 import scala.collection.JavaConverters._
 
 /**

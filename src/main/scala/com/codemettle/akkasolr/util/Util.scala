@@ -11,8 +11,8 @@ import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.{SolrInputDocument, SolrInputField}
-import spray.http.{HttpCharsets, Uri}
 
+import akka.http.scaladsl.model.{HttpCharsets, Uri}
 import akka.util.{ByteString, Helpers}
 import scala.collection.JavaConverters._
 
@@ -26,7 +26,7 @@ object Util {
      * @param solrUrl URL string to normalize
      * @return [[Uri]] with any trailing '/' dropped
      */
-    def normalize(solrUrl: String) = {
+    def normalize(solrUrl: String): Uri = {
         val u = Uri(solrUrl)
         val reversePath = u.path.reverse
         if (reversePath.startsWithSlash)
@@ -35,29 +35,29 @@ object Util {
             u
     }
 
-    def actorNamer(prefix: String) = {
+    def actorNamer(prefix: String): Iterator[String] = {
         (LongIterator from 0) map (i ⇒ s"$prefix${Helpers.base64(i)}")
     }
 
-    def createUpdateRequest(docs: SolrInputDocument*) = {
+    def createUpdateRequest(docs: SolrInputDocument*): UpdateRequest = {
         val ur = new UpdateRequest
         ur add docs.asJavaCollection
         ur
     }
 
-    def createQueryDeleteUpdateRequest(queries: String*) = {
+    def createQueryDeleteUpdateRequest(queries: String*): UpdateRequest = {
         val ur = new UpdateRequest
         ur setDeleteQuery queries.asJava
         ur
     }
 
-    def createIdDeleteUpdateRequest(ids: String*) = {
+    def createIdDeleteUpdateRequest(ids: String*): UpdateRequest = {
         val ur = new UpdateRequest
         ur deleteById ids.asJava
         ur
     }
 
-    def updateRequestToByteString(ur: UpdateRequest) = {
+    def updateRequestToByteString(ur: UpdateRequest): ByteString = {
         val bsb = ByteString.newBuilder
         val writer = new BufferedWriter(new OutputStreamWriter(bsb.asOutputStream, HttpCharsets.`UTF-8`.nioCharset))
 
@@ -74,7 +74,7 @@ object Util {
         bsb.result()
     }
 
-    def createSolrInputDocs(fieldMaps: Map[String, AnyRef]*) = {
+    def createSolrInputDocs(fieldMaps: Map[String, AnyRef]*): Seq[SolrInputDocument] = {
         fieldMaps map (fieldMap ⇒ {
             val fields = fieldMap map {
                 case (name, value) ⇒

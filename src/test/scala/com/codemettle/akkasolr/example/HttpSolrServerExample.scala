@@ -11,8 +11,7 @@ import java.util.UUID
 
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
-import spray.util._
-
+import com.codemettle.akkasolr.TestUtil._
 import com.codemettle.akkasolr.Solr
 
 import akka.actor.ActorSystem
@@ -31,7 +30,7 @@ object HttpSolrServerExample extends App {
     import system.dispatcher
     implicit val timeout = Timeout(15.seconds)
 
-    ultimately(system.shutdown()) {
+    ultimately(system.terminate()) {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
         val config = system.settings.config.as[Config]("example")

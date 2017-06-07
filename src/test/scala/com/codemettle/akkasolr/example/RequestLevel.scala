@@ -28,9 +28,9 @@ object RequestLevel extends App {
 
     val config = system.settings.config.as[Config]("example")
 
-    ultimately(system.shutdown()) {
+    ultimately(system.terminate()) {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
-        import spray.util._
+        import com.codemettle.akkasolr.TestUtil._
 
         val req = Solr.Select(rawQuery(config.as[String]("testQuery")))
 

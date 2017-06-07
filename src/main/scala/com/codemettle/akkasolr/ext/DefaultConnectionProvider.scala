@@ -7,11 +7,11 @@
  */
 package com.codemettle.akkasolr.ext
 
-import spray.http.Uri
-
 import com.codemettle.akkasolr.client.ClientConnection
 
-import akka.actor.ExtendedActorSystem
+import akka.actor.{ExtendedActorSystem, Props}
+import akka.http.scaladsl.model.Uri
+import akka.stream.Materializer
 
 /**
  * @author steven
@@ -19,5 +19,6 @@ import akka.actor.ExtendedActorSystem
  */
 class DefaultConnectionProvider extends ConnectionProvider {
     override def connectionActorProps(uri: Uri, username: Option[String], password: Option[String],
-                                      system: ExtendedActorSystem) = ClientConnection.props(uri, username, password)
+                                      system: ExtendedActorSystem)(implicit mat: Materializer): Props =
+        ClientConnection.props(uri, username, password)
 }

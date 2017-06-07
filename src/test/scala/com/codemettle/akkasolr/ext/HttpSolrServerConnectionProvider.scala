@@ -9,12 +9,13 @@ package com.codemettle.akkasolr.ext
 
 import org.apache.solr.client.solrj.impl.{HttpClientUtil, HttpSolrClient}
 import org.apache.solr.common.params.ModifiableSolrParams
-import spray.http.Uri
 
 import com.codemettle.akkasolr.client.SolrServerClientConnection
 
 import akka.actor.{ExtendedActorSystem, Props}
 import akka.event.Logging
+import akka.http.scaladsl.model.Uri
+import akka.stream.Materializer
 
 /**
  * @author steven
@@ -22,7 +23,7 @@ import akka.event.Logging
  */
 class HttpSolrServerConnectionProvider extends ConnectionProvider {
     override def connectionActorProps(uri: Uri, username: Option[String], password: Option[String],
-                                      system: ExtendedActorSystem): Props = {
+                                      system: ExtendedActorSystem)(implicit mat: Materializer): Props = {
         def httpSolrServer = {
             def clientOpt = for (u ← username; p ← password) yield {
                 val params = new ModifiableSolrParams

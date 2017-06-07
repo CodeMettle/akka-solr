@@ -8,15 +8,14 @@
 package com.codemettle.akkasolr
 package manager
 
-import spray.http.Uri
-
 import com.codemettle.akkasolr.Solr.{LBConnectionOptions, SolrCloudConnectionOptions}
 import com.codemettle.akkasolr.client.{LBClientConnection, SolrCloudConnection}
-import com.codemettle.akkasolr.manager.Manager.Messages.{SolrCloudClientTo, ClientTo, LBClientTo}
+import com.codemettle.akkasolr.manager.Manager.Messages.{ClientTo, LBClientTo, SolrCloudClientTo}
 import com.codemettle.akkasolr.manager.Manager.{ConnKey, connName}
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
+import akka.http.scaladsl.model.Uri
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -83,7 +82,7 @@ class Manager extends Actor {
         solrCloudConnections get (zkHost → opts) match {
             case Some((c, _)) ⇒ c
             case None ⇒
-                val lbServer = createLbConnection(Nil, LBConnectionOptions(actorSystem))
+                val lbServer = createLbConnection(Nil, LBConnectionOptions.materialize)
                 val actor = context.actorOf(SolrCloudConnection.props(lbServer, zkHost, opts), zkNamer.next())
                 context watch actor
                 solrCloudConnections += ((zkHost → opts) → (actor → lbServer))

@@ -7,8 +7,6 @@
  */
 package com.codemettle.akkasolr.ext
 
-import spray.http.Uri
-
 import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.ext.SolrExtImpl.zkRe
 import com.codemettle.akkasolr.imperative.ImperativeWrapper
@@ -16,8 +14,10 @@ import com.codemettle.akkasolr.manager.Manager
 import com.codemettle.akkasolr.util.Util
 
 import akka.ConfigurationException
-import akka.actor.{ActorRef, ExtendedActorSystem, Extension}
+import akka.actor.{ActorRef, ExtendedActorSystem, Extension, Props}
+import akka.http.scaladsl.model.Uri
 import akka.pattern.AskTimeoutException
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -30,7 +30,9 @@ object SolrExtImpl {
     private val zkRe = """zk://(([^,]+:\d+[,]?)+)""".r
 }
 
-class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
+class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
+    implicit val materializer = ActorMaterializer()
+
     val config = eas.settings.config getConfig "akkasolr"
 
     val manager = eas.actorOf(Manager.props, "Solr")
@@ -42,10 +44,18 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     val maxBooleanClauses = config getInt "solrMaxBooleanClauses"
 
     val maxChunkSize = {
-        val size = config getBytes "sprayMaxChunkSize"
+        val size = config getBytes "maxChunkSize"
         if (size > Int.MaxValue || size < 0) sys.error("Invalid maxChunkSize")
         size.toInt
     }
+
+    val maxContentLength = {
+        val size = config getBytes "maxContentLength"
+        if (size < 0) sys.error("Invalid maxContentLength")
+        size
+    }
+
+    val requestQueueSize = config getInt "requestQueueSize"
 
     val connectionProvider = {
         val fqcn = config getString "connectionProvider"
@@ -56,7 +66,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
         }
     }
 
-    def connectionActorProps(uri: Uri, username: Option[String] = None, password: Option[String] = None) =
+    def connectionActorProps(uri: Uri, username: Option[String] = None, password: Option[String] = None): Props =
         connectionProvider.connectionActorProps(uri, username, password, eas)
 
     private def managerMessageForUrl(solrUrl: String, user: Option[String], pass: Option[String]) = {
@@ -66,7 +76,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
                 // not letting the user customize the options...they could send a SolrCloudClientTo message manually,
                 // or maybe i'll add another method
                 Manager.Messages.SolrCloudClientTo(solrUrl.replaceAllLiterally("zk://", ""),
-                    Solr.SolrCloudConnectionOptions(eas))
+                    Solr.SolrCloudConnectionOptions.materialize)
         }
     }
 
@@ -97,7 +107,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return Unit; sends a [[Solr.SolrConnection]] message to `requestor`. A `spray.can.Http.ConnectionException`
      *         wrapped in a [[akka.actor.Status.Failure]] may be raised by Spray and sent to `requestor`.
      */
-    def clientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit requestor: ActorRef) = {
+    def clientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit requestor: ActorRef): Unit = {
         manager.tell(managerMessageForUrl(solrUrl, username, password), requestor)
     }
 
@@ -125,12 +135,13 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return a [[Future]] containing an [[com.codemettle.akkasolr.imperative.ImperativeWrapper]] around the
      *         akka-solr client connection
      */
-    def imperativeClientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)(implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
+    def imperativeClientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)
+                          (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
         clientFutureTo(solrUrl, username, password) map (a ⇒ ImperativeWrapper(a)(eas))
     }
 
     /**
-     * Request a SolrCloud connection that behaves like a [[org.apache.solr.client.solrj.impl.CloudSolrServer]].
+     * Request a SolrCloud connection that behaves like a [[org.apache.solr.client.solrj.impl.CloudSolrClient]].
      * Just like regular connections, a cached connection will be returned if one already exists.
      *
      * @see [[SolrExtImpl.clientTo()]]
@@ -142,13 +153,13 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      * @return Unit; sends a [[Solr.SolrConnection]] message to `requestor`.
      */
     def solrCloudClientTo(zkHost: String,
-                          options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions(eas))
-                         (implicit requestor: ActorRef) = {
+                          options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions.materialize)
+                         (implicit requestor: ActorRef): Unit = {
         manager.tell(Manager.Messages.SolrCloudClientTo(zkHost, options), requestor)
     }
 
     def solrCloudClientFutureTo(zkHost: String,
-                                options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions(eas))
+                                options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions.materialize)
                                (implicit exeCtx: ExecutionContext): Future[ActorRef] = {
         import akka.pattern.ask
         import scala.concurrent.duration._
@@ -161,7 +172,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     }
 
     def solrCloudImperativeClientTo(zkHost: String,
-                                    options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions(eas))
+                                    options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions.materialize)
                                    (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
         solrCloudClientFutureTo(zkHost, options) map (a ⇒ ImperativeWrapper(a)(eas))
     }
@@ -172,7 +183,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     }
 
     /**
-     * Request a LoadBalanced connection that behaves like a [[org.apache.solr.client.solrj.impl.LBHttpSolrServer]].
+     * Request a LoadBalanced connection that behaves like a [[org.apache.solr.client.solrj.impl.LBHttpSolrClient]].
      * Just like regular connections, a cached connection will be returned if one already exists.
      *
      * @see [[SolrExtImpl.clientTo()]]
@@ -185,13 +196,14 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
      *                  implicit `self`
      * @return Unit; sends a [[Solr.SolrLBConnection]] message to `requestor`
      */
-    def loadBalancedClientTo(solrUrls: Set[String], options: Solr.LBConnectionOptions = Solr.LBConnectionOptions(eas))
-                            (implicit requestor: ActorRef) = {
+    def loadBalancedClientTo(solrUrls: Set[String],
+                             options: Solr.LBConnectionOptions = Solr.LBConnectionOptions.materialize)
+                            (implicit requestor: ActorRef): Unit = {
         manager.tell(Manager.Messages.LBClientTo(urlsToUriMap(solrUrls), solrUrls, options), requestor)
     }
 
     def loadBalancedClientFutureTo(solrUrls: Set[String],
-                                   options: Solr.LBConnectionOptions = Solr.LBConnectionOptions(eas))
+                                   options: Solr.LBConnectionOptions = Solr.LBConnectionOptions.materialize)
                                   (implicit exeCtx: ExecutionContext): Future[ActorRef] = {
         import akka.pattern.ask
         import scala.concurrent.duration._
@@ -206,7 +218,7 @@ class SolrExtImpl(eas: ExtendedActorSystem) extends Extension {
     }
 
     def loadBalancedImperativeClientTo(solrUrls: Set[String],
-                                       options: Solr.LBConnectionOptions = Solr.LBConnectionOptions(eas))
+                                       options: Solr.LBConnectionOptions = Solr.LBConnectionOptions.materialize)
                                       (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
         loadBalancedClientFutureTo(solrUrls, options) map (a ⇒ ImperativeWrapper(a)(eas))
     }

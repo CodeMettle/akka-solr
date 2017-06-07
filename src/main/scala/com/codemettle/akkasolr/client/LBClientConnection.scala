@@ -5,14 +5,11 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
-package com.codemettle.akkasolr.client
+package com.codemettle.akkasolr
+package client
 
 import org.apache.solr.client.solrj.SolrQuery
-import spray.can.Http
-import spray.http.{StatusCode, StatusCodes, Uri}
-import spray.util._
 
-import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.Solr.{LBConnectionOptions, SolrOperation}
 import com.codemettle.akkasolr.client.LBClientConnection._
 import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.ImmutableSolrParams
@@ -20,28 +17,29 @@ import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, S
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
+import akka.http.scaladsl.model.{StatusCode, StatusCodes, Uri}
+import akka.stream.StreamTcpException
 import scala.concurrent.duration._
 import scala.util.Random
 
 /**
- * An actor for load-balancing requests between Solr servers. Based directly on [[org.apache.solr.client.solrj.impl.LBHttpSolrServer]]
+ * An actor for load-balancing requests between Solr servers. Based directly on [[org.apache.solr.client.solrj.impl.LBHttpSolrClient]]
  * so its notes on indexing hold for this implementation. Isn't strictly round robin (and neither is the original, due
  * to error handling and retries), but tries servers in random order for every request (so roughly equal distribution
  * over time). The random query sequences always try "zombie" servers after all "live" servers have been tried. Doesn't
  * provide ability to add/remove servers after creation, but could easily be added. The capability to query all servers
  * in parallel and return the first successful response isn't currently implemented, but could easily be added.
  *
- * @see [[org.apache.solr.client.solrj.impl.LBHttpSolrServer]]
+ * @see [[org.apache.solr.client.solrj.impl.LBHttpSolrClient]]
  * @author steven
  *
  */
 object LBClientConnection {
-    def props(servers: Iterable[Solr.SolrConnection], options: LBConnectionOptions) = {
+    def props(servers: Iterable[Solr.SolrConnection], options: LBConnectionOptions) =
         Props(new LBClientConnection(servers, options))
-    }
 
     /**
-     * Message that runs an operation analogously to [[org.apache.solr.client.solrj.impl.LBHttpSolrServer#request(org.apache.solr.client.solrj.impl.LBHttpSolrServer.Req)]]
+     * Message that runs an operation analogously to [[org.apache.solr.client.solrj.impl.LBHttpSolrClient#request(org.apache.solr.client.solrj.impl.LBHttpSolrClient.Req)]]
      *
      * @param op operation to run
      * @param servers a list of servers to try that don't necessarily have to be the same servers that the
@@ -76,7 +74,7 @@ object LBClientConnection {
     private case class DeadServerDetected(serverUri: Uri, origUrl: String, connection: ActorRef)
 
     private class ZombieChecker(server: ConnectionWrapper) extends Actor {
-        override def preStart() = {
+        override def preStart(): Unit = {
             super.preStart()
 
             server.connection ! (Solr.Select(emptyQuery) withTimeout 10.seconds)
@@ -87,16 +85,14 @@ object LBClientConnection {
             context stop self
         }
 
-        def receive = {
+        override def receive: Receive = {
             case resp: SolrQueryResponse if resp.status == 0 ⇒ sendStatus(successful = true)
             case _ ⇒ sendStatus(successful = false) // resp.status could be non-zero or it raised an exception
         }
     }
 
     private object ZombieChecker {
-        def props(server: ConnectionWrapper) = {
-            Props(new ZombieChecker(server))
-        }
+        def props(server: ConnectionWrapper) = Props(new ZombieChecker(server))
     }
 
     private case class ExtServerInfo(uri: Uri, orig: String)
@@ -120,13 +116,13 @@ object LBClientConnection {
         protected def deadServer(s: ConnectionWrapper): Server
         protected def serverInfo(s: Server, msgSender: ActorRef): (Uri, String, ActorRef)
 
-        override def preStart() = {
+        override def preStart(): Unit = {
             super.preStart()
 
             tryNext(startTime, initAlive, initDead)
         }
 
-        override def postStop() = {
+        override def postStop(): Unit = {
             super.postStop()
 
             hardTimeout.cancel()
@@ -169,7 +165,8 @@ object LBClientConnection {
         }
 
         private def errorMeansServerIsDead(t: Throwable): Boolean = t match {
-            case _: Http.ConnectionException ⇒ true
+            case _: Solr.ConnectionException ⇒ true
+            case _: StreamTcpException ⇒ true
             case Solr.ServerError(status, _) if deadServerErrors(status) ⇒ true
             case _ ⇒ false
         }
@@ -196,7 +193,7 @@ object LBClientConnection {
                 context stop self
         }
 
-        def receive = handleTimeout
+        override def receive: Receive = handleTimeout
 
         def sendingBehavior(current: Server, alive: List[Server], dead: Servers): Receive = handleTimeout orElse {
             case d: AkkaSolrDocument ⇒ sendStreamingMessage(d)
@@ -210,31 +207,30 @@ object LBClientConnection {
                                         initDead: Servers)
         extends RequestRunner[ConnectionWrapper, SolrQueryResponse](op, replyTo, initAlive, initDead) {
 
-        protected def createResponse(from: SolrQueryResponse, current: ConnectionWrapper) = from
-        protected def deadServer(s: ConnectionWrapper) = s
-        protected def serverInfo(s: ConnectionWrapper, msgSender: ActorRef) = (s.uri, s.originalUrl, s.connection)
+        protected def createResponse(from: SolrQueryResponse, current: ConnectionWrapper): SolrQueryResponse = from
+        protected def deadServer(s: ConnectionWrapper): ConnectionWrapper = s
+        protected def serverInfo(s: ConnectionWrapper, msgSender: ActorRef): (Uri, String, ActorRef) = (s.uri, s.originalUrl, s.connection)
         protected def sendOperation(curr: ConnectionWrapper, op: SolrOperation): Unit = curr.connection ! op
     }
 
     private object StandardRequestRunner {
         def props(op: Solr.SolrOperation, replyTo: ActorRef, alive: Vector[ConnectionWrapper],
-                  standardDead: Vector[ConnectionWrapper]) = {
+                  standardDead: Vector[ConnectionWrapper]) =
             Props(new StandardRequestRunner(op, replyTo, Random.shuffle(alive).toList,
                 Random.shuffle(standardDead).toList))
-        }
     }
 
     private class ExtendedRequestRunner(op: Solr.SolrOperation, replyTo: ActorRef, initAlive: ExtServers,
                                         initDead: Servers, solrManager: ActorRef)
         extends RequestRunner[ExtServer, ExtendedResponse](op, replyTo, initAlive, initDead) {
-        protected def createResponse(from: SolrQueryResponse, current: ExtServer) = {
+        protected def createResponse(from: SolrQueryResponse, current: ExtServer): ExtendedResponse = {
             current match {
                 case Left(info) ⇒ ExtendedResponse(from, info.orig)
                 case Right(cw) ⇒ ExtendedResponse(from, cw.originalUrl)
             }
         }
         protected def deadServer(s: ConnectionWrapper) = Right(s)
-        protected def serverInfo(s: ExtServer, msgSender: ActorRef) = s match {
+        protected def serverInfo(s: ExtServer, msgSender: ActorRef): (Uri, String, ActorRef) = s match {
             case Left(info) ⇒ (info.uri, info.orig, msgSender)
             case Right(cw) ⇒ (cw.uri, cw.originalUrl, cw.connection)
         }
@@ -246,10 +242,9 @@ object LBClientConnection {
 
     private object ExtendedRequestRunner {
         def props(op: Solr.SolrOperation, replyTo: ActorRef, initAlive: Vector[ExtServer],
-                  initDead: Vector[ConnectionWrapper], solrManager: ActorRef) = {
+                  initDead: Vector[ConnectionWrapper], solrManager: ActorRef) =
             Props(new ExtendedRequestRunner(op, replyTo, Random.shuffle(initAlive).toList,
                 Random.shuffle(initDead).toList, solrManager))
-        }
     }
 }
 
@@ -265,7 +260,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
     private var aliveServers = (servers map connectionToWrapper).toVector
     private var zombieServers = Vector.empty[ConnectionWrapper]
 
-    override def postStop() = {
+    override def postStop(): Unit = {
         super.postStop()
 
         aliveCheckTimer.cancel()
@@ -349,7 +344,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
     }
 
     private def addToAlive(wrapper: ConnectionWrapper) = {
-        if ((aliveServers find (_.uri == wrapper.uri)).isEmpty) {
+        if (!aliveServers.exists(_.uri == wrapper.uri)) {
             log debug ("{} rose from the dead", wrapper.uri)
 
             aliveServers :+= wrapper.copy(failedPings = 0)
@@ -379,7 +374,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
         context.actorOf(ExtendedRequestRunner.props(op, sender(), rest, zombies, context.parent))
     }
 
-    def receive = {
+    override def receive: Receive = {
         case CheckAlive ⇒ zombieServers foreach (z ⇒ context.actorOf(ZombieChecker props z))
 
         case ZombieCheckFinished(s, srv) ⇒ zombieCheckFinished(s, srv)

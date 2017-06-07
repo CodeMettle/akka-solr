@@ -7,14 +7,15 @@
  */
 package com.codemettle.akkasolr.ext
 
-import spray.http.Uri
-
 import akka.actor.{ExtendedActorSystem, Props}
+import akka.http.scaladsl.model.Uri
+import akka.stream.Materializer
 
 /**
  * @author steven
  *
  */
 trait ConnectionProvider {
-    def connectionActorProps(uri: Uri, username: Option[String], password: Option[String], system: ExtendedActorSystem): Props
+    def connectionActorProps(uri: Uri, username: Option[String], password: Option[String], system: ExtendedActorSystem)
+                            (implicit mat: Materializer): Props
 }

@@ -35,67 +35,67 @@ case class ImperativeWrapper(connection: ActorRef)(implicit arf: ActorRefFactory
 
     // Shortcut methods
 
-    def query(q: SolrParams) = {
+    def query(q: SolrParams): Future[SolrQueryResponse] = {
         call(Solr.Select(q))
     }
 
-    def query(q: SolrQueryBuilder) = {
+    def query(q: SolrQueryBuilder): Future[SolrQueryResponse] = {
         call(Solr.Select(q))
     }
 
-    def queryWithOptions(q: SolrParams, options: Solr.RequestOptions) = {
+    def queryWithOptions(q: SolrParams, options: Solr.RequestOptions): Future[SolrQueryResponse] = {
         call(Solr.Select(q, options))
     }
 
-    def queryWithOptions(q: SolrQueryBuilder, options: Solr.RequestOptions) = {
+    def queryWithOptions(q: SolrQueryBuilder, options: Solr.RequestOptions): Future[SolrQueryResponse] = {
         call(Solr.Select(q) withOptions options)
     }
 
-    def ping(options: Solr.RequestOptions = Solr.RequestOptions(actorSystem).copy(method = Solr.RequestMethods.GET, requestTimeout = 5.seconds)) = {
+    def ping(options: Solr.RequestOptions = Solr.RequestOptions.materialize.copy(method = Solr.RequestMethods.GET, requestTimeout = 5.seconds)): Future[SolrQueryResponse] = {
         call(new Solr.Ping(None, options))
     }
 
     def commit(waitForSearcher: Boolean = true, softCommit: Boolean = false,
-               options: Solr.RequestOptions = Solr.RequestOptions(actorSystem)) = {
+               options: Solr.RequestOptions = Solr.RequestOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Commit(waitForSearcher, softCommit, options))
     }
 
     def optimize(waitForSearcher: Boolean = true, maxSegments: Int = 1,
-                 options: Solr.RequestOptions = Solr.RequestOptions(actorSystem)) = {
+                 options: Solr.RequestOptions = Solr.RequestOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Optimize(waitForSearcher, maxSegments, options))
     }
 
-    def rollback(options: Solr.RequestOptions = Solr.RequestOptions(actorSystem)) = {
+    def rollback(options: Solr.RequestOptions = Solr.RequestOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Rollback(options))
     }
 
     def add(docs: Seq[SolrInputDocument],
-            options: Solr.RequestOptions = Solr.RequestOptions(actorSystem),
-            updateOptions: Solr.UpdateOptions = Solr.UpdateOptions(actorSystem)) = {
+            options: Solr.RequestOptions = Solr.RequestOptions.materialize,
+            updateOptions: Solr.UpdateOptions = Solr.UpdateOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Update AddSolrDocs (docs: _*) withOptions options withUpdateOptions updateOptions)
     }
 
     def deleteById(id: String,
-                   options: Solr.RequestOptions = Solr.RequestOptions(actorSystem),
-                   updateOptions: Solr.UpdateOptions = Solr.UpdateOptions(actorSystem)) = {
+                   options: Solr.RequestOptions = Solr.RequestOptions.materialize,
+                   updateOptions: Solr.UpdateOptions = Solr.UpdateOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Update DeleteById id withOptions options withUpdateOptions updateOptions)
     }
 
     def deleteByIds(ids: Seq[String],
-                    options: Solr.RequestOptions = Solr.RequestOptions(actorSystem),
-                    updateOptions: Solr.UpdateOptions = Solr.UpdateOptions(actorSystem)) = {
+                    options: Solr.RequestOptions = Solr.RequestOptions.materialize,
+                    updateOptions: Solr.UpdateOptions = Solr.UpdateOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Update DeleteById (ids: _*) withOptions options withUpdateOptions updateOptions)
     }
 
     def deleteByQuery(query: String,
-                      options: Solr.RequestOptions = Solr.RequestOptions(actorSystem),
-                      updateOptions: Solr.UpdateOptions = Solr.UpdateOptions(actorSystem)) = {
+                      options: Solr.RequestOptions = Solr.RequestOptions.materialize,
+                      updateOptions: Solr.UpdateOptions = Solr.UpdateOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Update DeleteByQueryString query withOptions options withUpdateOptions updateOptions)
     }
 
     def deleteByQueries(queries: Seq[String],
-                        options: Solr.RequestOptions = Solr.RequestOptions(actorSystem),
-                        updateOptions: Solr.UpdateOptions = Solr.UpdateOptions(actorSystem)) = {
+                        options: Solr.RequestOptions = Solr.RequestOptions.materialize,
+                        updateOptions: Solr.UpdateOptions = Solr.UpdateOptions.materialize): Future[SolrQueryResponse] = {
         call(Solr.Update DeleteByQueryString (queries: _*) withOptions options withUpdateOptions updateOptions)
     }
 }

@@ -7,8 +7,7 @@
  */
 package com.codemettle.akkasolr.client
 
-import spray.can.Http
-
+import com.codemettle.akkasolr.Solr
 import com.codemettle.akkasolr.client.ConnectingStasher._
 
 import akka.actor._
@@ -19,9 +18,7 @@ import scala.concurrent.duration._
  *
  */
 object ConnectingStasher {
-    def props = {
-        Props[ConnectingStasher]
-    }
+    def props = Props(new ConnectingStasher)
 
     private[client] case class WaitingRequest(sender: ActorRef, req: Any, timeoutRemaining: FiniteDuration,
                                               originalTimeout: FiniteDuration, recvdTime: Long = System.nanoTime())
@@ -41,13 +38,13 @@ class ConnectingStasher extends Actor {
 
     private var stashed = Map.empty[WaitingRequest, Cancellable]
 
-    def receive = {
+    override def receive: Receive = {
         case wr: WaitingRequest ⇒
             val t = context.system.scheduler.scheduleOnce(wr.timeoutRemaining, self, TimedOut(wr))
             stashed += (wr → t)
 
-        case TimedOut(wr @ WaitingRequest(replyTo, req, _, origTimeout, _)) ⇒
-            val msg = Status.Failure(new Http.ConnectionException(s"Connection not established within $origTimeout"))
+        case TimedOut(wr @ WaitingRequest(replyTo, _, _, origTimeout, _)) ⇒
+            val msg = Status.Failure(Solr.ConnectionException(s"Connection not established within $origTimeout"))
             replyTo.tell(msg, context.parent)
             stashed -= wr
 

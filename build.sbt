@@ -39,7 +39,7 @@ pomExtra := {
 
 // Build
 
-crossScalaVersions := Seq("2.11.8")
+crossScalaVersions := Seq("2.11.11", "2.12.3")
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -48,25 +48,25 @@ scalacOptions ++= Seq("-unchecked", "-feature", "-deprecation")
 libraryDependencies ++= Seq(
     Deps.akkaActor,
     Deps.solrj % Provided,
-    Deps.sprayCan
+    Deps.akkaHttpCore
 )
 
 libraryDependencies ++= Seq(
     Deps.akkaSlf,
     Deps.akkaTest,
+    Deps.ficus,
     Deps.solrj, // explicitly include even though not technically needed
     Deps.jclOverSlf4j,
     Deps.logback,
     Deps.scalaTest
 ) map (_ % Test)
 
-libraryDependencies += {
+scalacOptions += {
     CrossVersion partialVersion scalaVersion.value match {
-        case Some((2, 10)) => Deps.ficus2_10
-        case Some((2, 11)) => Deps.ficus2_11
-        case _ => sys.error("Ficus dependency needs updating")
+        case Some((x, y)) if x >= 2 && y >= 12 ⇒ "-target:jvm-1.8"
+        case _ ⇒ "-target:jvm-1.6"
     }
-} % Test
+}
 
 publishArtifact in Test := true
 

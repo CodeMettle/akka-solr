@@ -8,7 +8,6 @@
 package com.codemettle.akkasolr
 package client
 
-import java.io.InputStream
 import java.{lang ⇒ jl}
 
 import org.apache.solr.client.solrj.impl.{BinaryResponseParser, StreamingBinaryResponseParser, XMLResponseParser}
@@ -16,37 +15,46 @@ import org.apache.solr.client.solrj.{ResponseParser, StreamingResponseCallback}
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.params.{CommonParams, UpdateParams}
 import org.apache.solr.common.util.NamedList
-import spray.http._
 
 import com.codemettle.akkasolr.Solr.{RequestMethods, SolrOperation, SolrResponseTypes}
-import com.codemettle.akkasolr.client.RequestHandler.{Parsed, RespParserRetval, TimedOut}
+import com.codemettle.akkasolr.client.ClientConnection.RequestQueue
+import com.codemettle.akkasolr.client.RequestHandler.{BodyReadComplete, Parsed, TimedOut}
 import com.codemettle.akkasolr.solrtypes.{AkkaSolrDocument, SolrQueryResponse, SolrResultInfo}
 import com.codemettle.akkasolr.util.{ActorInputStream, Util}
 
 import akka.actor._
-import akka.pattern._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.{Authorization, BasicHttpCredentials}
+import akka.pattern.pipe
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.util.{Failure, Success}
 
 /**
  * @author steven
  *
  */
 object RequestHandler {
-    def props(baseUri: Uri, username: Option[String], password: Option[String], host: ActorRef, replyTo: ActorRef,
-              request: SolrOperation, timeout: FiniteDuration) = {
-        Props(new RequestHandler(baseUri, username, password, host, replyTo, request, timeout))
-    }
+    def props(baseUri: Uri, username: Option[String], password: Option[String], requestQueue: RequestQueue,
+              replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)(implicit mat: Materializer) =
+        Props(new RequestHandler(baseUri, username, password, requestQueue, replyTo, request, timeout))
 
     private type RespParserRetval = Either[String, (ResponseParser, HttpCharset)]
 
     private case object TimedOut
+    private case object BodyReadComplete
     private case class Parsed(result: NamedList[AnyRef])
 }
 
-class RequestHandler(baseUri: Uri, username: Option[String], password: Option[String], host: ActorRef,
-                     replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)
+class RequestHandler(baseUri: Uri, username: Option[String], password: Option[String], requestQueue: RequestQueue,
+                     replyTo: ActorRef, request: SolrOperation, timeout: FiniteDuration)(implicit mat: Materializer)
     extends Actor with ActorLogging {
+
+    import context.dispatcher
+
     class StreamCallback extends StreamingResponseCallback {
         override def streamSolrDocument(doc: SolrDocument): Unit = {
             sendMessage(AkkaSolrDocument(doc))
@@ -57,35 +65,34 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
         }
     }
 
-    private val timer = {
-        import context.dispatcher
-        actorSystem.scheduler.scheduleOnce(timeout, self, TimedOut)
-    }
+    private val timer = actorSystem.scheduler.scheduleOnce(timeout, self, TimedOut)
 
     private var shutdownTimer = Option.empty[Cancellable]
 
-    private var inputStream = Option.empty[ActorInputStream]
+//    private var inputStream = Option.empty[ActorInputStream]
 
-    private var chunkingResponse = false
+//    private var chunkingResponse = false
+    private var timedOut = false
+    private var receivedResponse = false
     private var chunkingDone = false
     private var sentResponse = false
 
-    override def preStart() = {
+    override def preStart(): Unit = {
         super.preStart()
 
         def authenticate(req: HttpRequest) = {
             def credsOpt = for (u ← username; p ← password) yield BasicHttpCredentials(u, p)
-            def headerOpt = credsOpt map (HttpHeaders.Authorization(_))
-            headerOpt.fold(req)(head ⇒ req.mapHeaders(head :: _))
+            def headerOpt = credsOpt map (Authorization(_))
+            headerOpt.fold(req)(head ⇒ req.mapHeaders(head +: _))
         }
 
         checkCreateHttpRequest match {
-            case Left(err) ⇒ sendError(Solr.InvalidRequest(err))
-            case Right(req) ⇒ host ! authenticate(req)
+            case Left(err) ⇒ sendError(None, Solr.InvalidRequest(err))
+            case Right(req) ⇒ requestQueue.queueRequest(authenticate(req)) pipeTo self
         }
     }
 
-    override def postStop() = {
+    override def postStop(): Unit = {
         super.postStop()
 
         timer.cancel()
@@ -97,9 +104,9 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
     }
 
     private def startShutdown() = {
-        if (!chunkingResponse)
+        /*if (!chunkingResponse)
             self ! PoisonPill
-        else {
+        else*/ {
             if (chunkingDone)
                 self ! PoisonPill
             else {
@@ -124,12 +131,13 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
     }
 
     private def chunkingFinished() = {
-        inputStream foreach (_.streamFinished())
+//        inputStream foreach (_.streamFinished())
         chunkingDone = true
         checkShutdown()
     }
 
-    private def sendError(err: Throwable) = {
+    private def sendError(respOpt: Option[HttpResponse], err: Throwable) = {
+        respOpt.foreach(_.discardEntityBytes())
         sendMessage(Status.Failure(err))
         sentResponse = true
         self ! PoisonPill
@@ -193,7 +201,7 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
 
     private def createHttpRequest = {
         request match {
-            case su@Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) ⇒
+            case su@Solr.Update(_, _, _, opts, _) ⇒
                 val request = su.basicUpdateRequest
 
                 val query = {
@@ -222,37 +230,56 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
         } else Right(createHttpRequest)
     }
 
-    private def getContentType(implicit resp: HttpResponse) = {
-        (resp.headers collect {
-            case HttpHeaders.`Content-Type`(ct) ⇒ ct
-        }).headOption
+/*
+    private def getContentType(implicit resp: HttpResponse): (MediaType, HttpCharset) = {
+        resp.entity.contentType.mediaType → resp.entity.contentType.charsetOption.getOrElse(HttpCharsets.`UTF-8`)
     }
+*/
 
     private def createResponseParser(implicit resp: HttpResponse) = {
-        getContentType.fold[RespParserRetval](Left("No Content-Type header found")) (ct ⇒ {
-            ct.mediaType match {
-                case MediaTypes.`application/xml` ⇒ Right(new XMLResponseParser → ct.charset)
+        val mediaType = resp.entity.contentType.mediaType
+        val charset = resp.entity.contentType.charsetOption.getOrElse(HttpCharsets.`UTF-8`)
+
+//        getContentType.fold[RespParserRetval](Left("No Content-Type header found")) (ct ⇒ {
+            mediaType match {
+                case MediaTypes.`application/xml` ⇒ Right(new XMLResponseParser → charset)
 
                 case MediaTypes.`application/octet-stream` if request.options.responseType ==
                     SolrResponseTypes.Streaming ⇒
-                    Right(new StreamingBinaryResponseParser(new StreamCallback) → ct.charset)
+                    Right(new StreamingBinaryResponseParser(new StreamCallback) → charset)
 
-                case MediaTypes.`application/octet-stream` ⇒ Right(new BinaryResponseParser → ct.charset)
+                case MediaTypes.`application/octet-stream` ⇒ Right(new BinaryResponseParser → charset)
 
-                case _ ⇒ Left(s"Unsupported response content type: ${ct.mediaType}")
+                case _ ⇒ Left(s"Unsupported response content type: $mediaType")
             }
-        })
+//        })
     }
 
-    private def processResponse(chunkStart: Boolean)(implicit resp: HttpResponse): Unit = {
-        def doCreateResponseParser(is: InputStream) = createResponseParser match {
-            case Left(err) ⇒ sendError(Solr.InvalidResponse(err))
+    private def processResponse/*(chunkStart: Boolean)*/(implicit resp: HttpResponse): Unit = {
+        def doCreateResponseParser(dataBytes: Source[ByteString, Any]) = createResponseParser match {
+            case Left(err) ⇒ sendError(Some(resp), Solr.InvalidResponse(err))
 
             case Right((parser, charset)) ⇒
-                implicit val dispatcher = Solr.Client.responseParserDispatcher
+                val is = new ActorInputStream()
 
-                Future(parser.processResponse(is, charset.value)) map Parsed recover
-                    { case t ⇒ Solr.ParseError(t)} pipeTo self
+            {
+                import context.dispatcher
+
+                dataBytes.runWith(Sink.foreach(is.enqueueBytes)) onComplete {
+                    case Success(_) ⇒
+                    is.streamFinished()
+                    self ! BodyReadComplete
+
+                    case Failure(t) ⇒ self ! Status.Failure(t)
+                }
+            }
+
+            {
+                implicit val dispatcher = Solr.Client.responseParserDispatcher
+                Future(parser.processResponse(is, charset.value)) map Parsed recover {
+                    case t ⇒ Status.Failure(Solr.ParseError(t))
+                } pipeTo self
+            }
         }
 
         resp.status match {
@@ -264,48 +291,60 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
                 */
 
             case StatusCodes.Forbidden ⇒
-                sendError(Solr.ServerError(resp.status, "Authentication is currently unsupported"))
+                sendError(Some(resp), Solr.ServerError(resp.status, "Authentication is currently unsupported"))
 
             case StatusCodes.ServiceUnavailable ⇒
-                sendError(Solr.ServerError(resp.status, "Solr may be shutting down or overloaded"))
+                sendError(Some(resp), Solr.ServerError(resp.status, "Solr may be shutting down or overloaded"))
 
             case StatusCodes.InternalServerError ⇒
-                sendError(Solr.ServerError(resp.status, "Probably a transient error"))
+                sendError(Some(resp), Solr.ServerError(resp.status, "Probably a transient error"))
 
             case StatusCodes.RequestEntityTooLarge ⇒
-                sendError(Solr.ServerError(resp.status, "Try sending large queries as POST instead of GET"))
+                sendError(Some(resp), Solr.ServerError(resp.status, "Try sending large queries as POST instead of GET"))
 
             case StatusCodes.NotFound ⇒
-                sendError(Solr.ServerError(resp.status, s"Is '${baseUri.path}' the correct address to Solr?"))
+                sendError(Some(resp), Solr.ServerError(resp.status, s"Is '${baseUri.path}' the correct address to Solr?"))
 
             case _ ⇒ // we can add more special cases as they arise
+/*
                 {
                     if (chunkStart) {
                         inputStream = Some(new ActorInputStream)
+*/
+                        doCreateResponseParser(resp.entity.dataBytes)
+/*
                         Right(inputStream.get)
                     } else resp.entity.data match {
                         case HttpData.Bytes(bytes) ⇒ Right(bytes.iterator.asInputStream)
                         case _ ⇒ Left(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
                     }
                 } match {
-                    case Left(err) ⇒ sendError(err)
+                    case Left(err) ⇒ sendError(Some(resp), err)
                     case Right(is) ⇒ doCreateResponseParser(is)
                 }
+*/
         }
     }
 
-    def receive = {
-        case TimedOut ⇒ sendError(Solr.RequestTimedOut(request.requestTimeout))
+    override def receive: Receive = {
+        case TimedOut if receivedResponse ⇒ sendError(None, Solr.RequestTimedOut(request.requestTimeout))
+        case TimedOut ⇒ timedOut = true
+
+        case resp: HttpResponse if timedOut ⇒ sendError(Some(resp), Solr.RequestTimedOut(request.requestTimeout))
 
         case resp: HttpResponse ⇒
-            log.debug("got non-chunked response: {}", resp)
-            processResponse(chunkStart = false)(resp)
+            receivedResponse = true
+            log.debug("response started: {}", resp)
+            processResponse/*(chunkStart = false)*/(resp)
 
+/*
         case ChunkedResponseStart(resp) ⇒
             log.debug("response started: {}", resp)
             chunkingResponse = true
             processResponse(chunkStart = true)(resp)
+*/
 
+/*
         case MessageChunk(data, _) ⇒ data match {
             case HttpData.Bytes(bytes) ⇒ inputStream foreach (_ enqueueBytes bytes)
 
@@ -314,8 +353,11 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
         }
 
         case _: ChunkedMessageEnd ⇒ chunkingFinished()
+*/
 
-        case Status.Failure(t) ⇒ sendError(t)
+        case BodyReadComplete ⇒ chunkingFinished()
+
+        case Status.Failure(t) ⇒ sendError(None, t)
 
         case Parsed(result) ⇒ finishedParsing(result)
 

@@ -29,8 +29,8 @@ import akka.pattern.pipe
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -69,9 +69,6 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
 
     private var shutdownTimer = Option.empty[Cancellable]
 
-//    private var inputStream = Option.empty[ActorInputStream]
-
-//    private var chunkingResponse = false
     private var timedOut = false
     private var receivedResponse = false
     private var chunkingDone = false
@@ -99,44 +96,39 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
         shutdownTimer foreach (_.cancel())
     }
 
-    private def sendMessage(m: Any) = {
+    private def sendMessage(m: Any): Unit = {
         replyTo.tell(m, context.parent)
     }
 
-    private def startShutdown() = {
-        /*if (!chunkingResponse)
+    private def startShutdown(): Unit = {
+        if (chunkingDone)
             self ! PoisonPill
-        else*/ {
-            if (chunkingDone)
-                self ! PoisonPill
-            else {
-                import context.dispatcher
+        else {
+            import context.dispatcher
 
-                import scala.concurrent.duration._
+            import scala.concurrent.duration._
 
-                shutdownTimer = Some(actorSystem.scheduler.scheduleOnce(1.second, self, PoisonPill))
-            }
+            shutdownTimer = Some(actorSystem.scheduler.scheduleOnce(1.second, self, PoisonPill))
         }
     }
 
-    private def checkShutdown() = {
+    private def checkShutdown(): Unit = {
         if (chunkingDone && sentResponse)
             self ! PoisonPill
     }
 
-    private def finishedParsing(result: NamedList[AnyRef]) = {
+    private def finishedParsing(result: NamedList[AnyRef]): Unit = {
         sendMessage(SolrQueryResponse(request, result))
         sentResponse = true
         startShutdown()
     }
 
-    private def chunkingFinished() = {
-//        inputStream foreach (_.streamFinished())
+    private def chunkingFinished(): Unit = {
         chunkingDone = true
         checkShutdown()
     }
 
-    private def sendError(respOpt: Option[HttpResponse], err: Throwable) = {
+    private def sendError(respOpt: Option[HttpResponse], err: Throwable): Unit = {
         respOpt.foreach(_.discardEntityBytes())
         sendMessage(Status.Failure(err))
         sentResponse = true
@@ -230,32 +222,24 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
         } else Right(createHttpRequest)
     }
 
-/*
-    private def getContentType(implicit resp: HttpResponse): (MediaType, HttpCharset) = {
-        resp.entity.contentType.mediaType → resp.entity.contentType.charsetOption.getOrElse(HttpCharsets.`UTF-8`)
-    }
-*/
-
     private def createResponseParser(implicit resp: HttpResponse) = {
         val mediaType = resp.entity.contentType.mediaType
         val charset = resp.entity.contentType.charsetOption.getOrElse(HttpCharsets.`UTF-8`)
 
-//        getContentType.fold[RespParserRetval](Left("No Content-Type header found")) (ct ⇒ {
-            mediaType match {
-                case MediaTypes.`application/xml` ⇒ Right(new XMLResponseParser → charset)
+        mediaType match {
+            case MediaTypes.`application/xml` ⇒ Right(new XMLResponseParser → charset)
 
-                case MediaTypes.`application/octet-stream` if request.options.responseType ==
-                    SolrResponseTypes.Streaming ⇒
-                    Right(new StreamingBinaryResponseParser(new StreamCallback) → charset)
+            case MediaTypes.`application/octet-stream` if request.options.responseType ==
+                SolrResponseTypes.Streaming ⇒
+                Right(new StreamingBinaryResponseParser(new StreamCallback) → charset)
 
-                case MediaTypes.`application/octet-stream` ⇒ Right(new BinaryResponseParser → charset)
+            case MediaTypes.`application/octet-stream` ⇒ Right(new BinaryResponseParser → charset)
 
-                case _ ⇒ Left(s"Unsupported response content type: $mediaType")
-            }
-//        })
+            case _ ⇒ Left(s"Unsupported response content type: $mediaType")
+        }
     }
 
-    private def processResponse/*(chunkStart: Boolean)*/(implicit resp: HttpResponse): Unit = {
+    private def processResponse(implicit resp: HttpResponse): Unit = {
         def doCreateResponseParser(dataBytes: Source[ByteString, Any]) = createResponseParser match {
             case Left(err) ⇒ sendError(Some(resp), Solr.InvalidResponse(err))
 
@@ -275,7 +259,7 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
             }
 
             {
-                implicit val dispatcher = Solr.Client.responseParserDispatcher
+                implicit val dispatcher: ExecutionContext = Solr.Client.responseParserDispatcher
                 Future(parser.processResponse(is, charset.value)) map Parsed recover {
                     case t ⇒ Status.Failure(Solr.ParseError(t))
                 } pipeTo self
@@ -305,24 +289,9 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
             case StatusCodes.NotFound ⇒
                 sendError(Some(resp), Solr.ServerError(resp.status, s"Is '${baseUri.path}' the correct address to Solr?"))
 
-            case _ ⇒ // we can add more special cases as they arise
-/*
-                {
-                    if (chunkStart) {
-                        inputStream = Some(new ActorInputStream)
-*/
-                        doCreateResponseParser(resp.entity.dataBytes)
-/*
-                        Right(inputStream.get)
-                    } else resp.entity.data match {
-                        case HttpData.Bytes(bytes) ⇒ Right(bytes.iterator.asInputStream)
-                        case _ ⇒ Left(Solr.InvalidResponse(s"Don't know how to handle entity type ${resp.entity.data.getClass.getSimpleName}"))
-                    }
-                } match {
-                    case Left(err) ⇒ sendError(Some(resp), err)
-                    case Right(is) ⇒ doCreateResponseParser(is)
-                }
-*/
+            case _ ⇒
+                // we can add more special cases as they arise
+                doCreateResponseParser(resp.entity.dataBytes)
         }
     }
 
@@ -336,24 +305,6 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
             receivedResponse = true
             log.debug("response started: {}", resp)
             processResponse/*(chunkStart = false)*/(resp)
-
-/*
-        case ChunkedResponseStart(resp) ⇒
-            log.debug("response started: {}", resp)
-            chunkingResponse = true
-            processResponse(chunkStart = true)(resp)
-*/
-
-/*
-        case MessageChunk(data, _) ⇒ data match {
-            case HttpData.Bytes(bytes) ⇒ inputStream foreach (_ enqueueBytes bytes)
-
-            case _ ⇒ sendError(
-                Solr.InvalidResponse(s"Don't know how to handle message chunk type ${data.getClass.getSimpleName}"))
-        }
-
-        case _: ChunkedMessageEnd ⇒ chunkingFinished()
-*/
 
         case BodyReadComplete ⇒ chunkingFinished()
 

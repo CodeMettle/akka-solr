@@ -11,8 +11,9 @@ import java.util.UUID
 
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
-import com.codemettle.akkasolr.TestUtil._
+
 import com.codemettle.akkasolr.Solr
+import com.codemettle.akkasolr.TestUtil._
 
 import akka.actor.ActorSystem
 import akka.pattern._

@@ -34,11 +34,10 @@ private[akkasolr] object ClientConnection {
     object fsm {
         sealed trait State
         case object Disconnected extends State
-//        case object Connecting extends State
         case object TestingConnection extends State
         case object Connected extends State
 
-        case class CCData(/*hostConn: ActorRef = null,*/ pingTriesRemaining: Int = 0)
+        case class CCData(pingTriesRemaining: Int = 0)
     }
 
     case class RequestQueue(baseUri: Uri, connPoolSettings: ConnectionPoolSettings)
@@ -80,7 +79,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
 
     startWith(fsm.Disconnected, fsm.CCData())
 
-    implicit val system = context.system
+    implicit val system: ActorSystem = context.system
 
     private val stasher = context.actorOf(ConnectingStasher.props, "stasher")
 
@@ -101,17 +100,10 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
 
     private def connSettings = {
         ClientConnectionSettings(context.system).withParserSettings(parserSettings)
-//            .copy(responseChunkAggregationLimit = 0, parserSettings = parserSettings)
     }
 
     private def connPoolSettings =
         ConnectionPoolSettings(context.system).withConnectionSettings(connSettings)
-
-/*
-    private def hostConnSettings = {
-        HostConnectorSettings(context.system).copy(connectionSettings = connSettings)
-    }
-*/
 
     private def serviceRequest(request: SolrOperation, requestor: ActorRef, timeout: FiniteDuration) = {
         def props = RequestHandler.props(baseUri, username, password, requestQueue, requestor, request, timeout)
@@ -124,18 +116,6 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
     }
 
     whenUnhandled {
-/*
-        case Event(Terminated(dead), data) ⇒ if (dead == data.hostConn) {
-            log debug "HostConnector actor died"
-
-            val exc = new Http.ConnectionException("Connection closed while trying to establish")
-            stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
-
-            goto(fsm.Disconnected) using fsm.CCData()
-        } else
-            stay()
-*/
-
         case Event(req: SolrOperation, _) ⇒
             val to = req.requestTimeout
             stasher ! ConnectingStasher.WaitingRequest(sender(), req, to, to)
@@ -162,39 +142,21 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
 
     when(fsm.Disconnected) {
         case Event(m: SolrOperation, _) ⇒
-/*
-            IO(Http)(actorSystem) ! Http.HostConnectorSetup(baseUri.authority.host.address, baseUri.effectivePort,
-                baseUri.isSsl, settings = Some(hostConnSettings))
-
-*/
             val to = m.requestTimeout
 
             stasher ! ConnectingStasher.WaitingRequest(sender(), m, to, to)
 
-//            goto(fsm.Connecting) using fsm.CCData()
-
             goto(fsm.TestingConnection) using fsm.CCData(pingTriesRemaining = 4)
     }
 
-/*
-    when(fsm.Connecting) (handleConnExc orElse {
-        case Event(i: Http.HostConnectorInfo, data) ⇒
-            log.debug("Connected; info={}", i)
-
-            context watch sender()
-
-            goto(fsm.TestingConnection) using fsm.CCData(sender(), pingTriesRemaining = 4)
-    })
-*/
-
     onTransition {
-        case _ -> fsm.TestingConnection ⇒ pingServer(/*nextStateData.hostConn*/)
+        case _ -> fsm.TestingConnection ⇒ pingServer()
     }
 
     when(fsm.TestingConnection) (handleConnExc orElse {
         case Event(Status.Failure(Solr.RequestTimedOut(_)), data) if data.pingTriesRemaining > 0 ⇒
             log debug "didn't get response from server ping, retrying"
-            pingServer(/*data.hostConn*/)
+            pingServer()
             stay() using data.copy(pingTriesRemaining = data.pingTriesRemaining - 1)
 
         case Event(Status.Failure(Solr.RequestTimedOut(_)), _) ⇒
@@ -219,11 +181,11 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
 
     when(fsm.Connected) {
         case Event(m: SolrOperation, _) ⇒
-            serviceRequest(/*data.hostConn, */m, sender(), m.requestTimeout)
+            serviceRequest(m, sender(), m.requestTimeout)
             stay()
 
         case Event(ConnectingStasher.StashedRequest(act, req: Solr.SolrOperation, remaining, _), _) ⇒
-            serviceRequest(/*data.hostConn, */req, act, remaining)
+            serviceRequest(req, act, remaining)
             stay()
     }
 

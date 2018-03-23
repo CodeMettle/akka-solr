@@ -4,8 +4,8 @@ import com.typesafe.config.Config
 
 import com.codemettle.akkasolr.Solr._
 
-import scala.concurrent.duration._
 import akka.http.impl.util.SettingsCompanion
+import scala.concurrent.duration._
 
 /**
   * Created by steven on 6/7/2017.

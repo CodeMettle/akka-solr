@@ -13,7 +13,6 @@ import org.scalatest._
 import com.codemettle.akkasolr.TestUtil._
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import scala.concurrent.duration._
 import scala.util.Random
 import scala.util.control.Exception.ultimately
@@ -25,8 +24,8 @@ import scala.util.control.Exception.ultimately
 class TestConfigs extends FlatSpec with Matchers {
     def withSystem(conf: Option[Config] = None, tests: (SysMat) ⇒ Unit = _ ⇒ Unit) = {
         val baseConf = ConfigFactory.load()
-        implicit val system = ActorSystem((Random.alphanumeric take 10).mkString, conf.fold(baseConf)(_ withFallback baseConf))
-        val mat = ActorMaterializer()
+        implicit val system: ActorSystem =
+            ActorSystem((Random.alphanumeric take 10).mkString, conf.fold(baseConf)(_ withFallback baseConf))
 
         ultimately {
             system.terminate().await

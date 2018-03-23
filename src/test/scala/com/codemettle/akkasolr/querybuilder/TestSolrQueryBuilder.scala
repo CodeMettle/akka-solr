@@ -25,7 +25,7 @@ import scala.concurrent.duration.Duration
  */
 object TestSolrQueryBuilder {
     implicit class RichSolrParams(val sp: SolrParams) extends AnyVal {
-        def toMap = {
+        def toScalaMap: Map[String, Vector[String]] = {
             import scala.collection.JavaConverters._
             (sp.getParameterNamesIterator.asScala map (k ⇒ k → sp.getParams(k).toVector)).toMap
         }
@@ -37,7 +37,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
     private def checkEquals(sp1: SolrParams, sp2: SolrParams): Unit = {
         import com.codemettle.akkasolr.querybuilder.TestSolrQueryBuilder.RichSolrParams
-        sp1.toMap should equal (sp2.toMap)
+        sp1.toScalaMap should equal (sp2.toScalaMap)
     }
 
     private def checkEquals(sp: SolrParams, sqc: SolrQueryBuilder): Unit = checkEquals(sp, sqc.toParams)

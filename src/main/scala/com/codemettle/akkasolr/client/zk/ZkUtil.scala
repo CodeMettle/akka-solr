@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
+/*
 package com.codemettle.akkasolr.client.zk
 
 import java.io.IOException
@@ -154,3 +155,4 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
         getSlices(requestCollection, zkStateReader, clusterState) map createUrlList
     }
 }
+*/

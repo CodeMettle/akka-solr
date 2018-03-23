@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
+/*
 package com.codemettle.akkasolr.client.zk
 
 import java.{lang ⇒ jl, util ⇒ ju}
@@ -224,3 +225,4 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
         }
     }
 }
+*/

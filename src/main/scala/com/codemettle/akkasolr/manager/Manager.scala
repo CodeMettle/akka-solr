@@ -41,7 +41,7 @@ object Manager {
 class Manager extends Actor {
     private var connections = Map.empty[ConnKey, ActorRef]
     private var lbConnections = Map.empty[(Set[ConnKey], LBConnectionOptions), ActorRef]
-    private var solrCloudConnections = Map.empty[(String, SolrCloudConnectionOptions), (ActorRef, ActorRef)]
+    private var solrCloudConnections = Map.empty[(String, SolrCloudConnectionOptions), ActorRef]
 
     private val lbNamer = Util actorNamer "loadBalancer"
     private val zkNamer = Util actorNamer "zkClient"
@@ -80,21 +80,18 @@ class Manager extends Actor {
 
     private def getSolrCloudConnection(zkHost: String, opts: SolrCloudConnectionOptions): ActorRef = {
         solrCloudConnections get (zkHost → opts) match {
-            case Some((c, _)) ⇒ c
+            case Some(c) ⇒ c
             case None ⇒
-                val lbServer = createLbConnection(Nil, LBConnectionOptions.materialize)
-                val actor = context.actorOf(SolrCloudConnection.props(lbServer, zkHost, opts), zkNamer.next())
+                val actor = context.actorOf(SolrCloudConnection.props(zkHost, opts), zkNamer.next())
                 context watch actor
-                solrCloudConnections += ((zkHost → opts) → (actor → lbServer))
+                solrCloudConnections += ((zkHost → opts) → actor)
                 actor
         }
     }
 
     def receive = {
-        case Terminated(act) ⇒ solrCloudConnections find (_._2._1 == act) foreach {
-            case (zkHost, (_, lbServer)) ⇒
-                context stop lbServer
-                solrCloudConnections -= zkHost
+        case Terminated(act) ⇒ solrCloudConnections find (_._2 == act) foreach {
+            case (hostAndOpts, _) ⇒ solrCloudConnections -= hostAndOpts
         }
 
         case SolrCloudClientTo(zkHost, opts) ⇒

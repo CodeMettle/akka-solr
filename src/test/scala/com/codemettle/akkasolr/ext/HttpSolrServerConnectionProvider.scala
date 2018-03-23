@@ -39,7 +39,10 @@ class HttpSolrServerConnectionProvider extends ConnectionProvider {
                 HttpClientUtil.createClient(params)
             }
 
-            new HttpSolrClient(uri.toString(), clientOpt.orNull)
+            val clientB = new HttpSolrClient.Builder()
+              .withBaseSolrUrl(uri.toString())
+
+            clientOpt.fold(clientB)(clientB.withHttpClient).build()
         }
 
         SolrServerClientConnection props httpSolrServer

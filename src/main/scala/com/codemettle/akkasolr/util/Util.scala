@@ -79,7 +79,7 @@ object Util {
             val fields = fieldMap map {
                 case (name, value) ⇒
                     val field = new SolrInputField(name)
-                    field.setValue(value, 1.0f)
+                    field.setValue(value)
                     name → field
             }
 

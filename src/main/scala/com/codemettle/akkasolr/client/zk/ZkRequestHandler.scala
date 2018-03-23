@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2014, CodeMettle
  */
+/*
 package com.codemettle.akkasolr
 package client.zk
 
@@ -241,3 +242,4 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
             handleCompleteUpdate(req, updateInfo, shardResponses + (r.server → r), startTime)
     }
 }
+*/

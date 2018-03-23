@@ -12,6 +12,7 @@ object Deps {
     val akkaActor = "com.typesafe.akka" %% "akka-actor" % Versions.akka
     val akkaHttpCore = "com.typesafe.akka" %% "akka-http-core" % Versions.akkaHttp
     val akkaSlf = "com.typesafe.akka" %% "akka-slf4j" % Versions.akka
+    val akkaStream = "com.typesafe.akka" %% "akka-stream" % Versions.akka
     val akkaTest = "com.typesafe.akka" %% "akka-testkit" % Versions.akka
     val ficus = "com.iheart" %% "ficus" % Versions.ficus
     val jclOverSlf4j = "org.slf4j" % "jcl-over-slf4j" % Versions.slf4j

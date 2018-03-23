@@ -39,7 +39,7 @@ pomExtra := {
 
 // Build
 
-crossScalaVersions := Seq("2.11.11", "2.12.3")
+crossScalaVersions := Seq("2.11.11", "2.12.5")
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -47,6 +47,7 @@ scalacOptions ++= Seq("-unchecked", "-feature", "-deprecation")
 
 libraryDependencies ++= Seq(
     Deps.akkaActor,
+    Deps.akkaStream,
     Deps.solrj % Provided,
     Deps.akkaHttpCore
 )

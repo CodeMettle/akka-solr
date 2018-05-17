@@ -9,6 +9,7 @@ package com.codemettle.akkasolr.solrtypes
 
 import com.codemettle.akkasolr.Solr
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.common.util.NamedList
 
 import scala.collection.JavaConverters._
 
@@ -47,6 +48,16 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
 
     @transient
     lazy val qTime = original.getQTime
+
+    @transient
+    lazy val errorOpt: Option[NamedList[_]] = Option(original.getResponse.get("error")) collect {
+        case nl: NamedList[_] ⇒ nl
+    }
+
+    @transient
+    lazy val errorMessageOpt: Option[String] = errorOpt.flatMap(nl ⇒ Option(nl.get("msg"))) collect {
+        case s: String ⇒ s
+    }
 
     @transient
     lazy val nextCursorMarkOpt = {

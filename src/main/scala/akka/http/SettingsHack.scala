@@ -39,7 +39,8 @@ object SettingsHack {
         c getBoolean "commit",
         if (!c.hasPath("commit-within") || c.getString("commit-within") == "infinite") None
         else Some(c.getDuration("commit-within").toNanos.nanos),
-        c getBoolean "overwrite"
+        c getBoolean "overwrite",
+        c getBoolean "fail-on-non-zero-status"
       )
   }
 

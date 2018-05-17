@@ -349,7 +349,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             val idsToDelete = Option(ur.getDeleteById).fold(Vector.empty[String])(_.asScala.toVector)
             val deleteQueries = Option(ur.getDeleteQuery).fold(Vector.empty[String])(_.asScala.toVector)
 
-            Update(docsToAdd, idsToDelete, deleteQueries, UpdateOptions(commit, commitWithin, !overwriteDisabled),
+            Update(docsToAdd, idsToDelete, deleteQueries,
+                UpdateOptions.materialize.copy(commit, commitWithin, !overwriteDisabled),
                 RequestOptions.materialize)
         }
     }
@@ -379,6 +380,10 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class ServerError(status: StatusCode, msg: String)
         extends Exception(s"$status - $msg") with NoStackTrace with AkkaSolrError
+
+    @SerialVersionUID(1L)
+    case class UpdateError(code: Int, errorMessage: Option[String])
+      extends Exception(s"${errorMessage.getOrElse("Unknown error")}, code: $code") with NoStackTrace with AkkaSolrError
 
     @SerialVersionUID(1L)
     case class AllServersDead()
@@ -440,7 +445,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
     @SerialVersionUID(1L)
     case class UpdateOptions(commit: Boolean,
                              commitWithin: Option[FiniteDuration],
-                             overwrite: Boolean)
+                             overwrite: Boolean,
+                             failOnNonZeroStatus: Boolean)
 
     object UpdateOptions {
         def materialize(implicit arf: ActorRefFactory): UpdateOptions = UpdateOptionsHack(actorSystem)

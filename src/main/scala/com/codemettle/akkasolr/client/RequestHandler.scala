@@ -74,6 +74,8 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
     private var chunkingDone = false
     private var sentResponse = false
 
+    private var updateOptions = Option.empty[Solr.UpdateOptions]
+
     override def preStart(): Unit = {
         super.preStart()
 
@@ -118,7 +120,15 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
     }
 
     private def finishedParsing(result: NamedList[AnyRef]): Unit = {
-        sendMessage(SolrQueryResponse(request, result))
+        val resp = SolrQueryResponse(request, result)
+        sendMessage {
+            updateOptions.fold[Any](resp) { implicit opts ⇒
+              resp.toFailMessage match {
+                  case Left(err) ⇒ Status.Failure(err)
+                  case Right(res) ⇒ res
+              }
+            }
+        }
         sentResponse = true
         startShutdown()
     }
@@ -194,6 +204,8 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
     private def createHttpRequest = {
         request match {
             case su@Solr.Update(_, _, _, opts, _) ⇒
+                updateOptions = Some(opts)
+
                 val request = su.basicUpdateRequest
 
                 val query = {

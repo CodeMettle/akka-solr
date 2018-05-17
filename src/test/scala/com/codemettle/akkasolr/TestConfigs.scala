@@ -45,6 +45,7 @@ class TestConfigs extends FlatSpec with Matchers {
                                                         |    commit = true
                                                         |    overwrite = false
                                                         |    commit-within = 10 secs
+                                                        |    fail-on-non-zero-status = false
                                                         |  }
                                                         |}""".stripMargin
 
@@ -73,7 +74,7 @@ class TestConfigs extends FlatSpec with Matchers {
 
         val updOpts = Solr.UpdateOptions.materialize(sysmat)
 
-        updOpts should equal (Solr.UpdateOptions(commit = false, None, overwrite = true))
+        updOpts should equal (Solr.UpdateOptions(commit = false, None, overwrite = true, failOnNonZeroStatus = true))
 
         val lbConnOpts = Solr.LBConnectionOptions.materialize(sysmat)
 
@@ -95,7 +96,7 @@ class TestConfigs extends FlatSpec with Matchers {
     "Default Update Options" should "be overridable" in withSystem(Some(nonDefaultUpdOpts), { implicit sysmat ⇒
         val updOpts = Solr.UpdateOptions.materialize(sysmat)
 
-        updOpts should equal (Solr.UpdateOptions(commit = true, Some(10.seconds), overwrite = false))
+        updOpts should equal (Solr.UpdateOptions(commit = true, Some(10.seconds), overwrite = false, failOnNonZeroStatus = false))
     })
 
     "Default LoadBalance connection Options" should "be overridable" in withSystem(Some(nonDefaultLbConnOpts), { implicit sysmat ⇒

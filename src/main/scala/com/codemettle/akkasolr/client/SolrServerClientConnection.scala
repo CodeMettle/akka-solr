@@ -61,6 +61,12 @@ object SolrServerClientConnection {
             finish(Future(op) map (r ⇒ SolrQueryResponse(req, r)))
         }
 
+        private def createUpdateOp(op: ⇒ NamedList[AnyRef])(implicit opts: Solr.UpdateOptions)=
+            Future(op).map(r ⇒ SolrQueryResponse(req, r)).failIfNeeded
+
+        private def runUpdateOp(op: ⇒ NamedList[AnyRef])(implicit opts: Solr.UpdateOptions): Unit =
+            finish(createUpdateOp(op))
+
         private def handleRequest(op: Solr.SolrOperation) = op match {
             case Solr.Ping(act, _) ⇒
                 val ping = new SolrPing
@@ -94,12 +100,12 @@ object SolrServerClientConnection {
 
                 if (opts.commit) {
                     // run update then commit then return update result
-                    val respF = Future(solrServer request ur) flatMap (updateRes ⇒ {
-                        Future(solrServer.commit()) map (_ ⇒ SolrQueryResponse(req, updateRes))
-                    })
+                    val respF = createUpdateOp(solrServer request ur)(opts).flatMap { updateRes ⇒
+                        Future(solrServer.commit()).map(_ ⇒ updateRes)
+                    }
                     finish(respF)
                 } else
-                    runOp(solrServer request ur)
+                    runUpdateOp(solrServer request ur)(opts)
         }
 
         def receive = {

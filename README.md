@@ -234,6 +234,7 @@ Changelog
 ---------
 
 * **3.0.0**
+  * Add update-defaults.fail-on-non-zero-status, set to true by default, which causes UpdateRequests to fail with a Solr.UpdateError if a non-zero status is returned to add/delete/commit requests
   * Upgrade SolrJ to version 7.2.1
   * Add support for Scala 2.12
   * Upgrade Akka to 2.5

@@ -7,7 +7,7 @@
  */
 
 object Versions {
-    val akka = "2.5.11"
+    val akka = "2.5.19"
     val akkaHttp = "10.1.0"
     val ficus = "1.4.1"
     val logback = "1.1.2"

@@ -196,7 +196,7 @@ class RequestHandler(baseUri: Uri, username: Option[String], password: Option[St
 
             case RequestMethods.POST ⇒
                 HttpRequest(HttpMethods.POST, uri, entity = HttpEntity(
-                    ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
+                    ContentType(MediaTypes.`application/x-www-form-urlencoded`),
                     query.toString()))
         }
     }

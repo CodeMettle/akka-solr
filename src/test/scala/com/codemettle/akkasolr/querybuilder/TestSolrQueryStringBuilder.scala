@@ -101,7 +101,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
         val p6 = AND(
             field("blah") := 2,
             field("f2") :!= "ueo",
-            defaultField() exists()
+            defaultField().exists()
         )
 
         p6.render should equal ("(blah:2 AND -f2:ueo AND [* TO *])")
@@ -110,7 +110,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
             defaultField() isAnyOf Seq(1, 2),
             AND(
                 field("f") := 2,
-                field("g") doesNotExist()
+                field("g").doesNotExist()
             )
         )
 

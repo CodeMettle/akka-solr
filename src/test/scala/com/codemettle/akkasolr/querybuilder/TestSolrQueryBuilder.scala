@@ -109,7 +109,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     }
 
     it should "add supported fields with cursor" in {
-        val sqc = Solr createQuery "*" rows 42 beginCursor() fields("f1", "f2") sortBy("f2".desc, "f1".asc) facets
+        val sqc = Solr.createQuery("*").rows(42).beginCursor() fields ("f1", "f2") sortBy ("f2".desc, "f1".asc) facets
             "f1" allowedExecutionTime 60000 withFacetLimit 10 withFacetMinCount 1 withFacetPrefix
             "testing" withFacetPivotFields "f2,f1" withGroupField "f1" withGroupSorts
             ("f1".asc, "f2".desc) withGroupFormat "simple" groupInMain true groupTotalCount true truncateGroupings
@@ -147,7 +147,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
     }
 
     it should "disallow start+cursor" in {
-        the[IllegalArgumentException] thrownBy (Solr createQuery "*" start 5 beginCursor()) should have message
+        the[IllegalArgumentException] thrownBy Solr.createQuery("*").start(5).beginCursor() should have message
             "'start' and 'cursorMark' options are mutually exclusive"
 
         the[IllegalArgumentException] thrownBy (Solr createQuery "*" withCursorMark "abc" start 5) should have message

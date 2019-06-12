@@ -4,14 +4,14 @@ import com.typesafe.config.Config
 
 import com.codemettle.akkasolr.Solr._
 
-import akka.http.impl.util.SettingsCompanion
+import akka.http.impl.util.SettingsCompanionImpl
 import scala.concurrent.duration._
 
 /**
   * Created by steven on 6/7/2017.
   */
 object SettingsHack {
-  object RequestOptionsHack extends SettingsCompanion[RequestOptions]("akkasolr.request-defaults") {
+  object RequestOptionsHack extends SettingsCompanionImpl[RequestOptions]("akkasolr.request-defaults") {
     override def fromSubConfig(root: Config, c: Config): RequestOptions =
       RequestOptions(
         c getString "method" match {
@@ -33,7 +33,7 @@ object SettingsHack {
       )
   }
 
-  object UpdateOptionsHack extends SettingsCompanion[UpdateOptions]("akkasolr.update-defaults") {
+  object UpdateOptionsHack extends SettingsCompanionImpl[UpdateOptions]("akkasolr.update-defaults") {
     override def fromSubConfig(root: Config, c: Config): UpdateOptions =
       UpdateOptions(
         c getBoolean "commit",
@@ -44,7 +44,7 @@ object SettingsHack {
       )
   }
 
-  object LBConnectionOptionsHack extends SettingsCompanion[LBConnectionOptions]("akkasolr.load-balanced-connection-defaults") {
+  object LBConnectionOptionsHack extends SettingsCompanionImpl[LBConnectionOptions]("akkasolr.load-balanced-connection-defaults") {
     override def fromSubConfig(root: Config, c: Config): LBConnectionOptions =
       LBConnectionOptions(
         c.getDuration("alive-check-interval").toNanos.nanos,
@@ -52,7 +52,7 @@ object SettingsHack {
       )
   }
 
-  object SolrCloudConnectionOptionsHack extends SettingsCompanion[SolrCloudConnectionOptions]("akkasolr.solrcloud-connection-defaults") {
+  object SolrCloudConnectionOptionsHack extends SettingsCompanionImpl[SolrCloudConnectionOptions]("akkasolr.solrcloud-connection-defaults") {
     override def fromSubConfig(root: Config, c: Config): SolrCloudConnectionOptions =
       SolrCloudConnectionOptions(
         c.getDuration("zookeeper-connect-timeout").toNanos.nanos,

@@ -39,9 +39,9 @@ pomExtra := {
 
 // Build
 
-crossScalaVersions := Seq("2.11.11", "2.12.5")
+crossScalaVersions := Seq("2.11.11", "2.12.5", "2.13.0")
 
-scalaVersion := crossScalaVersions.value.head
+scalaVersion := crossScalaVersions.value.last
 
 scalacOptions ++= Seq("-unchecked", "-feature", "-deprecation")
 

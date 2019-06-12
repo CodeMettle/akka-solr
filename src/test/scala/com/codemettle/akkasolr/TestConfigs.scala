@@ -22,7 +22,7 @@ import scala.util.control.Exception.ultimately
  *
  */
 class TestConfigs extends FlatSpec with Matchers {
-    def withSystem(conf: Option[Config] = None, tests: (SysMat) ⇒ Unit = _ ⇒ Unit) = {
+    def withSystem(conf: Option[Config] = None, tests: (SysMat) ⇒ Unit = _ ⇒ {}) = {
         val baseConf = ConfigFactory.load()
         implicit val system: ActorSystem =
             ActorSystem((Random.alphanumeric take 10).mkString, conf.fold(baseConf)(_ withFallback baseConf))

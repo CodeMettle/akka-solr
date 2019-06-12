@@ -27,5 +27,5 @@ case class AkkaSolrDocumentList(original: Option[SolrDocumentList]) {
     def maxScore = resultInfo.maxScore
 
     @transient
-    lazy val documents = original.fold(Seq.empty[SolrDocument])(o ⇒ o.asScala) map AkkaSolrDocument.apply
+    lazy val documents = original.fold(Seq.empty[SolrDocument])(o ⇒ o.asScala.toSeq) map AkkaSolrDocument.apply
 }

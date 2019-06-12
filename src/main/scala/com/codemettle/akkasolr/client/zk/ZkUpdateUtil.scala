@@ -8,7 +8,7 @@
 /*
 package com.codemettle.akkasolr.client.zk
 
-import java.{lang ⇒ jl, util ⇒ ju}
+import java.{lang => jl, util => ju}
 
 import org.apache.solr.client.solrj.impl.LBHttpSolrClient
 import org.apache.solr.client.solrj.request.UpdateRequest
@@ -46,19 +46,19 @@ object ZkUpdateUtil {
         def getStatusFromResp(shardResponse: NamedList[AnyRef]) = {
             def getStatusFromHeader(header: NamedList[_]) = {
                 header get "status" match {
-                    case shardStatus: jl.Integer ⇒ shardStatus.intValue()
-                    case _ ⇒ 0
+                    case shardStatus: jl.Integer => shardStatus.intValue()
+                    case _ => 0
                 }
             }
 
             shardResponse get "responseHeader" match {
-                case header: NamedList[_] ⇒ getStatusFromHeader(header)
-                case _ ⇒ 0
+                case header: NamedList[_] => getStatusFromHeader(header)
+                case _ => 0
             }
         }
 
         val status = (0 /: shardResponses.values) {
-            case (acc, shardResponse) ⇒
+            case (acc, shardResponse) =>
                 val s = getStatusFromResp(shardResponse)
                 if (s > 0) s else acc
         }
@@ -84,25 +84,25 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
             val urls = Vector(s"${zkProps.getBaseUrl}/${collection.getName}")
 
             val allUrls = (urls /: slice.getReplicas.asScala) {
-                case (acc, replica) if replica.getNodeName != leader.getNodeName && replica.getName != leader.getName ⇒
+                case (acc, replica) if replica.getNodeName != leader.getNodeName && replica.getName != leader.getName =>
                     val repProps = new ZkCoreNodeProps(replica)
                     acc :+ s"${repProps.getBaseUrl}/${collection.getName}"
-                case (acc, _) ⇒ acc
+                case (acc, _) => acc
             }
 
-            slice.getName → allUrls.asJava
+            slice.getName -> allUrls.asJava
         }
 
         // slices are immutable, so we can do a search for null leader and fail-fast before building the url map
 
         val slices = col.getActiveSlices.asScala
         slices find (_.getLeader == null) match {
-            case Some(_) ⇒
+            case Some(_) =>
                 // take unoptimized general path - we cannot find a leader yet
                 None
 
-            case None ⇒
-                val urlMap = (slices map (s ⇒ mapEntryFromSlice(col, s))).toMap
+            case None =>
+                val urlMap = (slices map (s => mapEntryFromSlice(col, s))).toMap
                 Some(urlMap.asJava)
         }
     }
@@ -119,19 +119,19 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
             Failure(Solr.InvalidRequest(s"No DocRouter found for ${col.getName}")))(Success(_))
 
         router map {
-            case _: ImplicitDocRouter ⇒ None
-            case r ⇒ Some(r)
+            case _: ImplicitDocRouter => None
+            case r => Some(r)
         }
     }
 
     private def getDocCollectionForRequest(zkStateReader: ZkStateReader, clusterState: ClusterState,
                                            collection: Option[String]): Try[DocCollection] = {
         def collectionName: Try[String] = collection orElse config.defaultCollection match {
-            case None ⇒
+            case None =>
                 Failure(Solr.InvalidRequest(
                     "No collection param specified on request and no default collection has been set"))
 
-            case Some(collName) ⇒ Success {
+            case Some(collName) => Success {
                 // Check to see if the collection is an alias.
 
                 (for {
@@ -142,8 +142,8 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
             }
         }
 
-        collectionName flatMap (collection ⇒ Try(clusterState getCollection collection) recoverWith {
-            case t ⇒ Failure(Solr.InvalidRequest(t.getMessage))
+        collectionName flatMap (collection => Try(clusterState getCollection collection) recoverWith {
+            case t => Failure(Solr.InvalidRequest(t.getMessage))
         })
     }
 
@@ -165,8 +165,8 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
         }
 
         routingInfo flatMap {
-            case None ⇒ Success(None)
-            case Some((docCol, router, urlMap)) ⇒ getRoutes(req, router, docCol, urlMap, routableParams)
+            case None => Success(None)
+            case Some((docCol, router, urlMap)) => getRoutes(req, router, docCol, urlMap, routableParams)
         }
     }
 
@@ -174,28 +174,28 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
                           urlMap: ju.Map[String, ju.List[String]],
                           routableParams: SolrParams): Try[Option[Map[String, LBClientConnection.ExtendedRequest]]] = {
         def transformReq(req: LBHttpSolrClient.Req): LBClientConnection.ExtendedRequest = req.getRequest match {
-            case ur: UpdateRequest ⇒
+            case ur: UpdateRequest =>
                 LBClientConnection.ExtendedRequest(Solr.SolrUpdateOperation(ur), req.getServers.asScala.toList)
 
-            case _ ⇒ sys.error(s"${req.getRequest} isn't an UpdateRequest")
+            case _ => sys.error(s"${req.getRequest} isn't an UpdateRequest")
         }
 
         def transformRoutes(routes: ju.Map[String, LBHttpSolrClient.Req]) = {
-            Option(routes) map (rs ⇒ (rs.asScala mapValues transformReq).toMap)
+            Option(routes) map (rs => (rs.asScala mapValues transformReq).toMap)
         }
 
         Try(req.getRoutes(router, col, urlMap, new ModifiableSolrParams(routableParams), config.idField)) transform
-            (r ⇒ Success(transformRoutes(r)), t ⇒ Failure(Solr.InvalidRequest(t.getMessage)))
+            (r => Success(transformRoutes(r)), t => Failure(Solr.InvalidRequest(t.getMessage)))
     }
 
     def directUpdateRoutes(zkStateReader: ZkStateReader, op: Solr.SolrUpdateOperation, clusterState: ClusterState, collection: Option[String], reqTimeout: FiniteDuration): Try[Option[DirectUpdateInfo]] = {
         val (updateRequest, allParams, routableParams) = createParams(op)
 
         getRoutesForRequest(zkStateReader, clusterState, updateRequest, collection, routableParams) flatMap {
-            case None ⇒ Success(None)
-            case Some(routes) if routes.isEmpty ⇒ Failure(Solr.InvalidRequest("No routes found for request"))
-            case Some(routes) ⇒
-                val routesWithTimeout = routes mapValues (r ⇒ r.copy(op = r.op withTimeout reqTimeout))
+            case None => Success(None)
+            case Some(routes) if routes.isEmpty => Failure(Solr.InvalidRequest("No routes found for request"))
+            case Some(routes) =>
+                val routesWithTimeout = routes mapValues (r => r.copy(op = r.op withTimeout reqTimeout))
                 Success(Some(DirectUpdateInfo(updateRequest, allParams, routesWithTimeout)))
         }
     }
@@ -203,9 +203,9 @@ case class ZkUpdateUtil(config: Solr.SolrCloudConnectionOptions)(implicit arf: A
     def getNonRoutableUpdate(updateInfo: DirectUpdateInfo, reqTimeout: FiniteDuration): Option[LBClientConnection.ExtendedRequest] = {
         val nonRoutableRequest: Option[UpdateRequest] = {
             Option(updateInfo.updateRequest.getDeleteQuery) match {
-                case None ⇒ None
-                case Some(qs) if qs.isEmpty ⇒ None
-                case Some(qs) ⇒
+                case None => None
+                case Some(qs) if qs.isEmpty => None
+                case Some(qs) =>
                     val deleteQueryRequest = new UpdateRequest()
                     deleteQueryRequest setDeleteQuery qs
                     Some(deleteQueryRequest)

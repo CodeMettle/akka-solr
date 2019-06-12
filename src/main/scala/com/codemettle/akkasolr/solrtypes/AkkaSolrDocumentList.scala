@@ -9,7 +9,7 @@ package com.codemettle.akkasolr.solrtypes
 
 import org.apache.solr.common.{SolrDocument, SolrDocumentList}
 
-import scala.collection.JavaConverters._
+import com.codemettle.akkasolr.CollectionConverters._
 
 /**
  * @author steven
@@ -19,7 +19,7 @@ import scala.collection.JavaConverters._
 case class AkkaSolrDocumentList(original: Option[SolrDocumentList]) {
     @transient
     val resultInfo = {
-        original.fold(SolrResultInfo(-1, -1, None))(o ⇒ SolrResultInfo(o.getNumFound, o.getStart, o.getMaxScore))
+        original.fold(SolrResultInfo(-1, -1, None))(o => SolrResultInfo(o.getNumFound, o.getStart, o.getMaxScore))
     }
 
     def numFound = resultInfo.numFound
@@ -27,5 +27,5 @@ case class AkkaSolrDocumentList(original: Option[SolrDocumentList]) {
     def maxScore = resultInfo.maxScore
 
     @transient
-    lazy val documents = original.fold(Seq.empty[SolrDocument])(o ⇒ o.asScala.toSeq) map AkkaSolrDocument.apply
+    lazy val documents = original.fold(Seq.empty[SolrDocument])(o => o.asScala.toSeq) map AkkaSolrDocument.apply
 }

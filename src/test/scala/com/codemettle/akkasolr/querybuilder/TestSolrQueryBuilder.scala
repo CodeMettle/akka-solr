@@ -8,11 +8,11 @@
 package com.codemettle.akkasolr.querybuilder
 
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.common.params.{GroupParams ⇒ SolrGroupParams, CommonParams, ShardParams, StatsParams, SolrParams}
+import org.apache.solr.common.params.{CommonParams, ShardParams, SolrParams, StatsParams, GroupParams => SolrGroupParams}
 import org.scalatest._
 
 import com.codemettle.akkasolr.Solr
-import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.{ImmutableSolrParams, FieldStrToSort}
+import com.codemettle.akkasolr.querybuilder.SolrQueryBuilder.{FieldStrToSort, ImmutableSolrParams}
 import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.RawQuery
 
 import akka.actor.ActorSystem
@@ -26,8 +26,8 @@ import scala.concurrent.duration.Duration
 object TestSolrQueryBuilder {
     implicit class RichSolrParams(val sp: SolrParams) extends AnyVal {
         def toScalaMap: Map[String, Vector[String]] = {
-            import scala.collection.JavaConverters._
-            (sp.getParameterNamesIterator.asScala map (k ⇒ k → sp.getParams(k).toVector)).toMap
+            import com.codemettle.akkasolr.CollectionConverters._
+            (sp.getParameterNamesIterator.asScala map (k => k -> sp.getParams(k).toVector)).toMap
         }
     }
 }
@@ -242,22 +242,22 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
         val sqb1 = SolrQueryBuilder.fromSolrQuery(q)
 
         sqb1.query should equal (RawQuery("*"))
-        sqb1.rowsOpt should be ('empty)
-        sqb1.fieldList should be ('empty)
-        sqb1.startOpt should be ('empty)
-        sqb1.sortsList should be ('empty)
-        sqb1.facetParams.fields should be ('empty)
-        sqb1.serverTimeAllowed should be ('empty)
-        sqb1.facetParams.limit should be ('empty)
-        sqb1.facetParams.minCount should be ('empty)
-        sqb1.facetParams.prefix should be ('empty)
-        sqb1.groupParams.field should be ('empty)
-        sqb1.groupParams.sortsList should be ('empty)
-        sqb1.groupParams.format should be ('empty)
-        sqb1.groupParams.main should be ('empty)
-        sqb1.groupParams.totalCount should be ('empty)
-        sqb1.groupParams.truncate should be ('empty)
-        sqb1.shardList should be ('empty)
+        sqb1.rowsOpt shouldBe empty
+        sqb1.fieldList shouldBe empty
+        sqb1.startOpt shouldBe empty
+        sqb1.sortsList shouldBe empty
+        sqb1.facetParams.fields shouldBe empty
+        sqb1.serverTimeAllowed shouldBe empty
+        sqb1.facetParams.limit shouldBe empty
+        sqb1.facetParams.minCount shouldBe empty
+        sqb1.facetParams.prefix shouldBe empty
+        sqb1.groupParams.field shouldBe empty
+        sqb1.groupParams.sortsList shouldBe empty
+        sqb1.groupParams.format shouldBe empty
+        sqb1.groupParams.main shouldBe empty
+        sqb1.groupParams.totalCount shouldBe empty
+        sqb1.groupParams.truncate shouldBe empty
+        sqb1.shardList shouldBe empty
 
         q setRows 10
 
@@ -313,7 +313,7 @@ class TestSolrQueryBuilder(_system: ActorSystem) extends TestKit(_system) with F
 
         val sqb8 = SolrQueryBuilder.fromSolrQuery(q)
 
-        sqb8.startOpt should be ('empty)
+        sqb8.startOpt shouldBe empty
         sqb8.cursorMarkOpt.value should equal ("abc")
 
         q.add(SolrGroupParams.GROUP, "true")

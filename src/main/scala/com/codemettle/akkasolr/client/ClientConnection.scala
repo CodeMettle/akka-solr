@@ -54,8 +54,8 @@ private[akkasolr] object ClientConnection {
         private val queue = Source.queue[(HttpRequest, Promise[HttpResponse])](Solr.Client.requestQueueSize, OverflowStrategy.dropNew)
           .via(connPool)
           .toMat(Sink.foreach {
-              case ((Success(resp), p)) ⇒ p.success(resp)
-              case ((Failure(t), p)) ⇒ p.failure(t)
+              case ((Success(resp), p)) => p.success(resp)
+              case ((Failure(t), p)) => p.failure(t)
           })(Keep.left)
           .run()
 
@@ -63,11 +63,11 @@ private[akkasolr] object ClientConnection {
 
         def queueRequest(req: HttpRequest)(implicit ec: ExecutionContext): Future[HttpResponse] = {
             val p = Promise[HttpResponse]()
-            queue.offer(req → p) flatMap {
-                case QueueOfferResult.Enqueued ⇒ p.future
-                case QueueOfferResult.Failure(t) ⇒ Future.failed(t)
-                case QueueOfferResult.Dropped ⇒ Future.failed(new Exception(s"Request queue for $baseUri is full"))
-                case QueueOfferResult.QueueClosed ⇒ Future.failed(new Exception(s"Request queue for $baseUri is closed"))
+            queue.offer(req -> p) flatMap {
+                case QueueOfferResult.Enqueued => p.future
+                case QueueOfferResult.Failure(t) => Future.failed(t)
+                case QueueOfferResult.Dropped => Future.failed(new Exception(s"Request queue for $baseUri is full"))
+                case QueueOfferResult.QueueClosed => Future.failed(new Exception(s"Request queue for $baseUri is closed"))
             }
         }
     }
@@ -116,23 +116,23 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
     }
 
     whenUnhandled {
-        case Event(req: SolrOperation, _) ⇒
+        case Event(req: SolrOperation, _) =>
             val to = req.requestTimeout
             stasher ! ConnectingStasher.WaitingRequest(sender(), req, to, to)
             stay()
 
-        case Event(ConnectingStasher.StashedRequest(act, req, remainingTimeout, origTimeout), _) ⇒
+        case Event(ConnectingStasher.StashedRequest(act, req, remainingTimeout, origTimeout), _) =>
             // if we get this message, it means that we successfully connected, asked for stashed connections, and
             // then got disconnected before processing them all
             stasher ! ConnectingStasher.WaitingRequest(act, req, remainingTimeout, origTimeout)
             stay()
 
-        case Event(m, _) ⇒
+        case Event(m, _) =>
             stay() replying Status.Failure(Solr.InvalidRequest(m.toString))
     }
 
     private def handleConnExc: StateFunction = {
-        case Event(Status.Failure(e: StreamTcpException), _) ⇒
+        case Event(Status.Failure(e: StreamTcpException), _) =>
             log.error(e, "Couldn't connect to {}", baseUri)
 
             stasher ! ConnectingStasher.ErrorOutAllWaiting(e)
@@ -141,7 +141,7 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
     }
 
     when(fsm.Disconnected) {
-        case Event(m: SolrOperation, _) ⇒
+        case Event(m: SolrOperation, _) =>
             val to = m.requestTimeout
 
             stasher ! ConnectingStasher.WaitingRequest(sender(), m, to, to)
@@ -150,41 +150,41 @@ private[akkasolr] class ClientConnection(baseUri: Uri, username: Option[String],
     }
 
     onTransition {
-        case _ -> fsm.TestingConnection ⇒ pingServer()
+        case _ -> fsm.TestingConnection => pingServer()
     }
 
     when(fsm.TestingConnection) (handleConnExc orElse {
-        case Event(Status.Failure(Solr.RequestTimedOut(_)), data) if data.pingTriesRemaining > 0 ⇒
+        case Event(Status.Failure(Solr.RequestTimedOut(_)), data) if data.pingTriesRemaining > 0 =>
             log debug "didn't get response from server ping, retrying"
             pingServer()
             stay() using data.copy(pingTriesRemaining = data.pingTriesRemaining - 1)
 
-        case Event(Status.Failure(Solr.RequestTimedOut(_)), _) ⇒
+        case Event(Status.Failure(Solr.RequestTimedOut(_)), _) =>
             log warning "Never got a response from server ping, aborting"
             val exc = Solr.ConnectionException("No response to server pings")
             stasher ! ConnectingStasher.ErrorOutAllWaiting(exc)
             goto(fsm.Disconnected) using fsm.CCData()
 
-        case Event(qr: SolrQueryResponse, _) ⇒
+        case Event(qr: SolrQueryResponse, _) =>
             log.debug("got response to ping {}, check status etc?", qr)
             goto(fsm.Connected)
 
-        case Event(Status.Failure(t), _) ⇒
+        case Event(Status.Failure(t), _) =>
             log.error(t, "Couldn't ping server")
             stasher ! ConnectingStasher.ErrorOutAllWaiting(t)
             goto(fsm.Disconnected) using fsm.CCData()
     })
 
     onTransition {
-        case fsm.TestingConnection -> fsm.Connected ⇒ stasher ! ConnectingStasher.FlushWaitingRequests
+        case fsm.TestingConnection -> fsm.Connected => stasher ! ConnectingStasher.FlushWaitingRequests
     }
 
     when(fsm.Connected) {
-        case Event(m: SolrOperation, _) ⇒
+        case Event(m: SolrOperation, _) =>
             serviceRequest(m, sender(), m.requestTimeout)
             stay()
 
-        case Event(ConnectingStasher.StashedRequest(act, req: Solr.SolrOperation, remaining, _), _) ⇒
+        case Event(ConnectingStasher.StashedRequest(act, req: Solr.SolrOperation, remaining, _), _) =>
             serviceRequest(req, act, remaining)
             stay()
     }

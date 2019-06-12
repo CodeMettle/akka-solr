@@ -40,7 +40,7 @@ object HttpSolrServerExample extends App {
 
         println((conn ? Solr.Ping()).await)
 
-        println((conn ? (Solr.Update AddDocs Map("uuid" → UUID.randomUUID().toString, "messageType" → "DummyType") commit true)).await)
+        println((conn ? (Solr.Update AddDocs Map("uuid" -> UUID.randomUUID().toString, "messageType" -> "DummyType") commit true)).await)
 
         println((conn ? Solr.Select(defaultField() := "DummyType")).await)
 

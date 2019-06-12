@@ -12,9 +12,10 @@ import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.params.UpdateParams
 import org.scalatest._
 
+import com.codemettle.akkasolr.CollectionConverters._
+
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 /**
@@ -36,9 +37,9 @@ class TestSolrUpdateOperations(_system: ActorSystem) extends TestKit(_system) wi
 
         val update = Solr.Update(ur1)
 
-        update.addDocs should be ('empty)
-        update.deleteIds should be ('empty)
-        update.deleteQueries should be ('empty)
+        update.addDocs shouldBe empty
+        update.deleteIds shouldBe empty
+        update.deleteQueries shouldBe empty
         update.updateOptions.commit should equal (true)
     }
 
@@ -111,7 +112,7 @@ class TestSolrUpdateOperations(_system: ActorSystem) extends TestKit(_system) wi
     "Solr.Update" should "convert to/from SolrJ UpdateRequest" in {
         import com.codemettle.akkasolr.querybuilder.SolrQueryStringBuilder.Methods._
 
-        def randDocs = (0 until 5) map (i ⇒ Map[String, AnyRef]("id" → (i: java.lang.Integer)))
+        def randDocs = (0 until 5) map (i => Map[String, AnyRef]("id" -> (i: java.lang.Integer)))
 
         val upd = Solr.Update AddDocs (randDocs: _*) deleteByQuery OR(defaultField() := "1", field("id") := 2) deleteById "3" deleteById "4"
 
@@ -123,7 +124,7 @@ class TestSolrUpdateOperations(_system: ActorSystem) extends TestKit(_system) wi
         ur1.getDeleteById.get(0) should equal ("3")
         ur1.getDeleteById.get(1) should equal ("4")
         ur1.getDocuments should have size 5
-        ur1.getDocuments.asScala.zipWithIndex foreach {case (doc, i) ⇒ doc.getFieldValue("id") should equal (i)}
+        ur1.getDocuments.asScala.zipWithIndex foreach {case (doc, i) => doc.getFieldValue("id") should equal (i)}
 
         Solr.Update(ur1) should equal (upd)
 
@@ -142,7 +143,7 @@ class TestSolrUpdateOperations(_system: ActorSystem) extends TestKit(_system) wi
 
         val updCWOW = updCW overwrite false
         val ur4 = updCWOW.solrJUpdateRequest
-        ur4.getDocumentsMap.values.asScala foreach (d ⇒ {
+        ur4.getDocumentsMap.values.asScala foreach (d => {
             d.get(UpdateRequest.COMMIT_WITHIN) should equal (5000)
             d.get(UpdateRequest.OVERWRITE) should equal (false)
         })
@@ -159,7 +160,7 @@ class TestSolrUpdateOperations(_system: ActorSystem) extends TestKit(_system) wi
 
         val updCWOWCmt = updCWOW commit true
         val ur6 = updCWOWCmt.solrJUpdateRequest
-        ur6.getDocumentsMap.values.asScala foreach (d ⇒ {
+        ur6.getDocumentsMap.values.asScala foreach (d => {
             d.get(UpdateRequest.COMMIT_WITHIN) should equal (5000)
             d.get(UpdateRequest.OVERWRITE) should equal (false)
         })

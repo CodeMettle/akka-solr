@@ -34,15 +34,15 @@ package object akkasolr {
         def toQuery: Uri.Query = {
             // Duplicate behavior of org.apache.solr.client.solrj.util.ClientUtils.toQueryString
             def paramToKVs(paramName: String): Seq[(String, String)] = sp getParams paramName match {
-                case null ⇒ Seq(paramName → Uri.Query.EmptyValue)
-                case arr if arr.isEmpty ⇒ Nil
-                case values ⇒ values map {
-                    case null ⇒ paramName → Uri.Query.EmptyValue
-                    case v ⇒ paramName → v
+                case null => Seq(paramName -> Uri.Query.EmptyValue)
+                case arr if arr.isEmpty => Nil
+                case values => values.toIndexedSeq map {
+                    case null => paramName -> Uri.Query.EmptyValue
+                    case v => paramName -> v
                 }
             }
 
-            import scala.collection.JavaConverters._
+            import CollectionConverters._
 
             Uri.Query((sp.getParameterNamesIterator.asScala flatMap paramToKVs).toSeq: _*)
         }
@@ -52,8 +52,8 @@ package object akkasolr {
     implicit def nlToQueryResp(nl: NamedList[AnyRef]): QueryResponse = new QueryResponse(nl, null)
 
     def actorSystem(implicit arf: ActorRefFactory): ActorSystem = arf match {
-        case as: ActorSystem ⇒ as
-        case ac: ActorContext ⇒ ac.system
-        case _ ⇒ sys.error(s"Unsupported ActorRefFactory: $arf")
+        case as: ActorSystem => as
+        case ac: ActorContext => ac.system
+        case _ => sys.error(s"Unsupported ActorRefFactory: $arf")
     }
 }

@@ -62,8 +62,8 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
     final val connectionProvider = {
         val fqcn = config getString "connectionProvider"
         eas.dynamicAccess.createInstanceFor[ConnectionProvider](fqcn, Nil) match {
-            case Success(cp) ⇒ cp
-            case Failure(e) ⇒
+            case Success(cp) => cp
+            case Failure(e) =>
                 throw new ConfigurationException(s"Could not find/load Connection Provider class [$fqcn]", e)
         }
     }
@@ -73,8 +73,8 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
 
     private def managerMessageForUrl(solrUrl: String, user: Option[String], pass: Option[String]) = {
         zkRe findFirstIn solrUrl match {
-            case None ⇒ Manager.Messages.ClientTo(Util normalize solrUrl, solrUrl, user, pass)
-            case Some(_) ⇒
+            case None => Manager.Messages.ClientTo(Util normalize solrUrl, solrUrl, user, pass)
+            case Some(_) =>
                 // not letting the user customize the options...they could send a SolrCloudClientTo message manually,
                 // or maybe i'll add another method
                 Manager.Messages.SolrCloudClientTo(solrUrl.replaceAllLiterally("zk://", ""),
@@ -125,8 +125,8 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
         implicit val timeout: Timeout = Timeout(10.seconds)
 
         (manager ? managerMessageForUrl(solrUrl, username, password)).mapTo[Solr.SolrConnection] transform (_.connection, {
-            case _: AskTimeoutException ⇒ new Exception("Unknown error, no response from Solr Manager")
-            case t ⇒ t
+            case _: AskTimeoutException => new Exception("Unknown error, no response from Solr Manager")
+            case t => t
         })
     }
 
@@ -139,7 +139,7 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
      */
     def imperativeClientTo(solrUrl: String, username: Option[String] = None, password: Option[String] = None)
                           (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
-        clientFutureTo(solrUrl, username, password) map (a ⇒ ImperativeWrapper(a)(eas))
+        clientFutureTo(solrUrl, username, password) map (a => ImperativeWrapper(a)(eas))
     }
 
     /**
@@ -168,20 +168,20 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
         implicit val timeout: Timeout = Timeout(10.seconds)
 
         (manager ? Manager.Messages.SolrCloudClientTo(zkHost, options)).mapTo[Solr.SolrConnection] transform (_.connection, {
-            case _: AskTimeoutException ⇒ new Exception("Unknown error, no response from Solr Manager")
-            case t ⇒ t
+            case _: AskTimeoutException => new Exception("Unknown error, no response from Solr Manager")
+            case t => t
         })
     }
 
     def solrCloudImperativeClientTo(zkHost: String,
                                     options: Solr.SolrCloudConnectionOptions = Solr.SolrCloudConnectionOptions.materialize)
                                    (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
-        solrCloudClientFutureTo(zkHost, options) map (a ⇒ ImperativeWrapper(a)(eas))
+        solrCloudClientFutureTo(zkHost, options) map (a => ImperativeWrapper(a)(eas))
     }
 
     // combines any urls that normalize to the same uri
-    private def urlsToUriMap(solrUrls: Set[String]) = (Map.empty[Uri, String] /: solrUrls) {
-        case (acc, solrUrl) ⇒ acc + ((Util normalize solrUrl) → solrUrl)
+    private def urlsToUriMap(solrUrls: Set[String]) = solrUrls.foldLeft(Map.empty[Uri, String]) {
+        case (acc, solrUrl) => acc + ((Util normalize solrUrl) -> solrUrl)
     }
 
     /**
@@ -214,14 +214,14 @@ class SolrExtImpl(implicit eas: ExtendedActorSystem) extends Extension {
         val msg = Manager.Messages.LBClientTo(urlsToUriMap(solrUrls), solrUrls, options)
 
         (manager ? msg).mapTo[Solr.SolrLBConnection] transform(_.connection, {
-            case _: AskTimeoutException ⇒ new Exception("Unknown error, no response from Solr Manager")
-            case t ⇒ t
+            case _: AskTimeoutException => new Exception("Unknown error, no response from Solr Manager")
+            case t => t
         })
     }
 
     def loadBalancedImperativeClientTo(solrUrls: Set[String],
                                        options: Solr.LBConnectionOptions = Solr.LBConnectionOptions.materialize)
                                       (implicit exeCtx: ExecutionContext): Future[ImperativeWrapper] = {
-        loadBalancedClientFutureTo(solrUrls, options) map (a ⇒ ImperativeWrapper(a)(eas))
+        loadBalancedClientFutureTo(solrUrls, options) map (a => ImperativeWrapper(a)(eas))
     }
 }

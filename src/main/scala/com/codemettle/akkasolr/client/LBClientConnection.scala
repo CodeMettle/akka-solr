@@ -86,8 +86,8 @@ object LBClientConnection {
         }
 
         override def receive: Receive = {
-            case resp: SolrQueryResponse if resp.status == 0 ⇒ sendStatus(successful = true)
-            case _ ⇒ sendStatus(successful = false) // resp.status could be non-zero or it raised an exception
+            case resp: SolrQueryResponse if resp.status == 0 => sendStatus(successful = true)
+            case _ => sendStatus(successful = false) // resp.status could be non-zero or it raised an exception
         }
     }
 
@@ -112,7 +112,7 @@ object LBClientConnection {
         private var streaming = false
 
         protected def createResponse(from: SolrQueryResponse, current: Server): RespType
-        protected def sendOperation(curr: Server, op: Solr.SolrOperation)
+        protected def sendOperation(curr: Server, op: Solr.SolrOperation): Unit
         protected def deadServer(s: ConnectionWrapper): Server
         protected def serverInfo(s: Server, msgSender: ActorRef): (Uri, String, ActorRef)
 
@@ -165,10 +165,10 @@ object LBClientConnection {
         }
 
         private def errorMeansServerIsDead(t: Throwable): Boolean = t match {
-            case _: Solr.ConnectionException ⇒ true
-            case _: StreamTcpException ⇒ true
-            case Solr.ServerError(status, _) if deadServerErrors(status) ⇒ true
-            case _ ⇒ false
+            case _: Solr.ConnectionException => true
+            case _: StreamTcpException => true
+            case Solr.ServerError(status, _) if deadServerErrors(status) => true
+            case _ => false
         }
 
         private def handleError(t: Throwable, errorFrom: ActorRef, curr: Server, alive: List[Server], dead: Servers) = {
@@ -187,7 +187,7 @@ object LBClientConnection {
         }
 
         private def handleTimeout: Receive = {
-            case ReqTimeout ⇒
+            case ReqTimeout =>
                 // this is only a fail-safe, the underlying connection should time out the request if the limit is hit
                 replyTo ! Status.Failure(Solr.RequestTimedOut(op.requestTimeout))
                 context stop self
@@ -196,10 +196,10 @@ object LBClientConnection {
         override def receive: Receive = handleTimeout
 
         def sendingBehavior(current: Server, alive: List[Server], dead: Servers): Receive = handleTimeout orElse {
-            case d: AkkaSolrDocument ⇒ sendStreamingMessage(d)
-            case ri: SolrResultInfo ⇒ sendStreamingMessage(ri)
-            case sqr: SolrQueryResponse ⇒ replyWithResult(createResponse(sqr, current), current, sender())
-            case Status.Failure(t) ⇒ handleError(t, sender(), current, alive, dead)
+            case d: AkkaSolrDocument => sendStreamingMessage(d)
+            case ri: SolrResultInfo => sendStreamingMessage(ri)
+            case sqr: SolrQueryResponse => replyWithResult(createResponse(sqr, current), current, sender())
+            case Status.Failure(t) => handleError(t, sender(), current, alive, dead)
         }
     }
 
@@ -225,18 +225,18 @@ object LBClientConnection {
         extends RequestRunner[ExtServer, ExtendedResponse](op, replyTo, initAlive, initDead) {
         protected def createResponse(from: SolrQueryResponse, current: ExtServer): ExtendedResponse = {
             current match {
-                case Left(info) ⇒ ExtendedResponse(from, info.orig)
-                case Right(cw) ⇒ ExtendedResponse(from, cw.originalUrl)
+                case Left(info) => ExtendedResponse(from, info.orig)
+                case Right(cw) => ExtendedResponse(from, cw.originalUrl)
             }
         }
         protected def deadServer(s: ConnectionWrapper) = Right(s)
         protected def serverInfo(s: ExtServer, msgSender: ActorRef): (Uri, String, ActorRef) = s match {
-            case Left(info) ⇒ (info.uri, info.orig, msgSender)
-            case Right(cw) ⇒ (cw.uri, cw.originalUrl, cw.connection)
+            case Left(info) => (info.uri, info.orig, msgSender)
+            case Right(cw) => (cw.uri, cw.originalUrl, cw.connection)
         }
         protected def sendOperation(curr: ExtServer, op: SolrOperation): Unit = curr match {
-            case Left(info) ⇒ solrManager ! Solr.Request(info.orig, op)
-            case Right(cw) ⇒ cw.connection ! op
+            case Left(info) => solrManager ! Solr.Request(info.orig, op)
+            case Right(cw) => cw.connection ! op
         }
     }
 
@@ -271,7 +271,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
         ConnectionWrapper(addr, Util normalize addr, conn.connection)
     }
 
-    private def updateZombie(z: ConnectionWrapper, f: (ConnectionWrapper) ⇒ ConnectionWrapper) = {
+    private def updateZombie(z: ConnectionWrapper, f: (ConnectionWrapper) => ConnectionWrapper) = {
         val idx = zombieServers indexWhere (_.uri == z.uri)
         if (idx >= 0)
             zombieServers = zombieServers.updated(idx, f(zombieServers(idx)))
@@ -286,7 +286,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
         //   fail-fast collection (and so they stop being checked)
 
         // this only runs if the given server is, in fact, a zombie
-        zombieServers find (_.uri == server.uri) foreach (z ⇒ {
+        zombieServers find (_.uri == server.uri) foreach (z => {
             if (successful) {
                 removeFromDead(z.uri)
                 if (z.standard)
@@ -305,7 +305,7 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
 
     private def handleServerIsAlive(serverUri: Uri): Unit = {
         // the only case we care about is if this server is in the zombies list
-        zombieServers find (_.uri == serverUri) foreach (z ⇒ {
+        zombieServers find (_.uri == serverUri) foreach (z => {
             // always remove from dead
             zombieServers = zombieServers filterNot (_ == z)
             // but only add it to alive if it's standard
@@ -317,13 +317,13 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
     private def handleServerIsDead(serverUri: Uri, origUrl: String, connection: ActorRef): Unit = {
         // the class currently doesn't handle adding/removing "standard" servers, but write this method as if it does
 
-        def addToDeadIfNeeded(conn: ⇒ ConnectionWrapper) = {
+        def addToDeadIfNeeded(conn: => ConnectionWrapper) = {
             zombieServers find (_.uri == serverUri) match {
-                case None ⇒
+                case None =>
                     log debug ("burying {}", conn.uri)
                     zombieServers :+= conn
 
-                case Some(s) ⇒
+                case Some(s) =>
                     val newDead = conn
                     // this won't happen unless we enable adding/removing servers and we get a change while a
                     // request is in-flight and the request errors out and the request was to a newly-added server
@@ -335,11 +335,11 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
         }
 
         aliveServers find (_.uri == serverUri) match {
-            case Some(cw) ⇒
+            case Some(cw) =>
                 aliveServers = aliveServers filterNot (_ == cw)
                 addToDeadIfNeeded(cw)
 
-            case None ⇒ addToDeadIfNeeded(ConnectionWrapper(origUrl, serverUri, connection, standard = false))
+            case None => addToDeadIfNeeded(ConnectionWrapper(origUrl, serverUri, connection, standard = false))
         }
     }
 
@@ -353,21 +353,21 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
 
     private def runExtendedRequest(op: Solr.SolrOperation, serverStrs: List[String], numDeadToTry: Int) = {
         // collapse all server urls into unique URIs and (one of) their corresponding URL
-        val urisAndOrigStrs = (Map.empty[Uri, String] /: serverStrs) {
-            case (acc, str) ⇒ acc + (Util.normalize(str) → str)
+        val urisAndOrigStrs = serverStrs.foldLeft(Map.empty[Uri, String]) {
+            case (acc, str) => acc + (Util.normalize(str) -> str)
         }
 
         // separate out specified servers that we know are zombies from ones that we don't know about or are known good
-        val (zombies, rest) = ((Vector.empty[ConnectionWrapper], Vector.empty[ExtServer]) /: urisAndOrigStrs) {
-            case ((accZombies, accToTry), (serverUri, serverStr)) ⇒
+        val (zombies, rest) = urisAndOrigStrs.foldLeft(Vector.empty[ConnectionWrapper] -> Vector.empty[ExtServer]) {
+            case ((accZombies, accToTry), (serverUri, serverStr)) =>
                 def liveOrExtendedServer: ExtServer = {
                     val existing = aliveServers find (_.uri == serverUri)
                     existing.fold[ExtServer](Left(ExtServerInfo(serverUri, serverStr)))(Right(_))
                 }
 
                 zombieServers find (_.uri == serverUri) match {
-                    case None ⇒ accZombies → (accToTry :+ liveOrExtendedServer)
-                    case Some(z) ⇒ (accZombies :+ z) → accToTry
+                    case None => accZombies -> (accToTry :+ liveOrExtendedServer)
+                    case Some(z) => (accZombies :+ z) -> accToTry
                 }
         }
 
@@ -375,18 +375,18 @@ class LBClientConnection(servers: Iterable[Solr.SolrConnection], options: LBConn
     }
 
     override def receive: Receive = {
-        case CheckAlive ⇒ zombieServers foreach (z ⇒ context.actorOf(ZombieChecker props z))
+        case CheckAlive => zombieServers foreach (z => context.actorOf(ZombieChecker props z))
 
-        case ZombieCheckFinished(s, srv) ⇒ zombieCheckFinished(s, srv)
+        case ZombieCheckFinished(s, srv) => zombieCheckFinished(s, srv)
 
-        case op: Solr.SolrOperation ⇒
+        case op: Solr.SolrOperation =>
             // the request runner will reply to the sender and also send us any dead/alive messages
             context.actorOf(StandardRequestRunner.props(op, sender(), aliveServers, zombieServers filter (_.standard)))
 
-        case ExtendedRequest(op, serverStrs, numDeadToTry) ⇒ runExtendedRequest(op, serverStrs, numDeadToTry)
+        case ExtendedRequest(op, serverStrs, numDeadToTry) => runExtendedRequest(op, serverStrs, numDeadToTry)
 
-        case ServerSuccessfullyQueried(serverUri) ⇒ handleServerIsAlive(serverUri)
+        case ServerSuccessfullyQueried(serverUri) => handleServerIsAlive(serverUri)
 
-        case DeadServerDetected(uri, url, conn) ⇒ handleServerIsDead(uri, url, conn)
+        case DeadServerDetected(uri, url, conn) => handleServerIsDead(uri, url, conn)
     }
 }

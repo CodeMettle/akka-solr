@@ -232,7 +232,7 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "IsAnyOf" should "render correctly if empty" in {
-        IsAnyOf(Some("blah"), Nil).render should be ('empty)
+        IsAnyOf(Some("blah"), Nil).render shouldBe empty
     }
 
     "NOT" should "render correctly if empty" in {
@@ -250,6 +250,6 @@ class TestSolrQueryStringBuilder(_system: ActorSystem) extends TestKit(_system) 
 
         (field("x") isNoneOf Seq("a", "b", "c")).render should equal ("-x:(a OR b OR c)")
 
-        (field("z") isNoneOf Nil).render should be ('empty)
+        (field("z") isNoneOf Nil).render shouldBe empty
     }
 }

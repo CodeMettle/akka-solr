@@ -48,11 +48,11 @@ class Manager extends Actor {
 
     private def getConnection(key: ConnKey, addr: String): ActorRef = {
         connections get key match {
-            case Some(c) ⇒ c
-            case None ⇒
+            case Some(c) => c
+            case None =>
                 val name = connName.replaceAllIn(key.uri.toString(), "-")
                 val actor = context.actorOf(Solr.Client.connectionActorProps(key.uri, key.user, key.pass), name)
-                connections += (key → actor)
+                connections += (key -> actor)
                 actor
         }
     }
@@ -65,54 +65,54 @@ class Manager extends Actor {
     private def getLbConnection(addrs: Map[Uri, String], opts: LBConnectionOptions): ActorRef = {
         val connKeys = addrs.keySet.map(ConnKey(_, None, None))
 
-        lbConnections get (connKeys → opts) match {
-            case Some(c) ⇒ c
-            case None ⇒
+        lbConnections get (connKeys -> opts) match {
+            case Some(c) => c
+            case None =>
                 val connections = addrs map {
-                    case (uri, addr) ⇒ Solr.SolrConnection(addr, getConnection(ConnKey(uri, None, None), addr))
+                    case (uri, addr) => Solr.SolrConnection(addr, getConnection(ConnKey(uri, None, None), addr))
                 }
 
                 val actor = createLbConnection(connections, opts)
-                lbConnections += ((connKeys → opts) → actor)
+                lbConnections += ((connKeys -> opts) -> actor)
                 actor
         }
     }
 
     private def getSolrCloudConnection(zkHost: String, opts: SolrCloudConnectionOptions): ActorRef = {
-        solrCloudConnections get (zkHost → opts) match {
-            case Some(c) ⇒ c
-            case None ⇒
+        solrCloudConnections get (zkHost -> opts) match {
+            case Some(c) => c
+            case None =>
                 val actor = context.actorOf(SolrCloudConnection.props(zkHost, opts), zkNamer.next())
                 context watch actor
-                solrCloudConnections += ((zkHost → opts) → actor)
+                solrCloudConnections += ((zkHost -> opts) -> actor)
                 actor
         }
     }
 
     def receive = {
-        case Terminated(act) ⇒ solrCloudConnections find (_._2 == act) foreach {
-            case (hostAndOpts, _) ⇒ solrCloudConnections -= hostAndOpts
+        case Terminated(act) => solrCloudConnections find (_._2 == act) foreach {
+            case (hostAndOpts, _) => solrCloudConnections -= hostAndOpts
         }
 
-        case SolrCloudClientTo(zkHost, opts) ⇒
+        case SolrCloudClientTo(zkHost, opts) =>
             val connection = getSolrCloudConnection(zkHost, opts)
 
             sender().tell(Solr.SolrConnection(zkHost, connection), connection)
 
-        case LBClientTo(addrs, orig, opts) ⇒
+        case LBClientTo(addrs, orig, opts) =>
             val connection = getLbConnection(addrs, opts)
 
             sender().tell(Solr.SolrLBConnection(orig, connection), connection)
 
-        case ClientTo(uri, addr, user, pass) ⇒
+        case ClientTo(uri, addr, user, pass) =>
             val connection = getConnection(ConnKey(uri, user, pass), addr)
 
             sender().tell(Solr.SolrConnection(addr, connection), connection)
 
-        case Solr.Request(addr, op, user, pass) ⇒
+        case Solr.Request(addr, op, user, pass) =>
             Try(Util normalize addr) match {
-                case Failure(t) ⇒ sender() ! Status.Failure(t)
-                case Success(uri) ⇒ getConnection(ConnKey(uri, user, pass), addr) forward op
+                case Failure(t) => sender() ! Status.Failure(t)
+                case Success(uri) => getConnection(ConnKey(uri, user, pass), addr) forward op
             }
     }
 }

@@ -37,16 +37,16 @@ object SolrQueryStringBuilder {
         }
 
         def render(implicit arf: ActorRefFactory): String = this.simplify match {
-            case Empty ⇒ ""
-            case RawQuery(q) ⇒ q
-            case FieldValue(f, v) ⇒ f.fold(valueEsc(v))(fn ⇒ s"$fn:${valueEsc(v)}")
-            case Not(q) ⇒ notRender(q)
-            case Range(f, l, u) ⇒ f.fold(s"[$l TO $u]")(fn ⇒ s"$fn:[$l TO $u]")
-            case OrQuery(parts) ⇒ andOrRender(parts, " OR ")
-            case AndQuery(parts) ⇒ andOrRender(parts, " AND ")
-            case IsAnyOf(field, values) ⇒
+            case Empty => ""
+            case RawQuery(q) => q
+            case FieldValue(f, v) => f.fold(valueEsc(v))(fn => s"$fn:${valueEsc(v)}")
+            case Not(q) => notRender(q)
+            case Range(f, l, u) => f.fold(s"[$l TO $u]")(fn => s"$fn:[$l TO $u]")
+            case OrQuery(parts) => andOrRender(parts, " OR ")
+            case AndQuery(parts) => andOrRender(parts, " AND ")
+            case IsAnyOf(field, values) =>
                 def valsToOr(vals: Iterable[FieldValueType]) = {
-                    val prefix = field.fold("")(f ⇒ s"$f:")
+                    val prefix = field.fold("")(f => s"$f:")
                     vals.map(valueEsc).mkString(s"$prefix(", " OR ", ")")
                 }
                 if (values.isEmpty)
@@ -58,15 +58,15 @@ object SolrQueryStringBuilder {
         }
 
         def simplify: QueryPart = this match {
-            case RawQuery(rq) if rq.isEmpty ⇒ Empty
-            case OrQuery(parts) ⇒
+            case RawQuery(rq) if rq.isEmpty => Empty
+            case OrQuery(parts) =>
                 val newParts = parts.map(_.simplify).filterNot(_ eq Empty)
                 if (newParts.nonEmpty) OrQuery(newParts) else Empty
-            case AndQuery(parts) ⇒
+            case AndQuery(parts) =>
                 val newParts = parts.map(_.simplify).filterNot(_ eq Empty)
                 if (newParts.nonEmpty) AndQuery(newParts) else Empty
-            case IsAnyOf(_, values) if values.isEmpty ⇒ Empty
-            case _ ⇒ this
+            case IsAnyOf(_, values) if values.isEmpty => Empty
+            case _ => this
         }
     }
 
@@ -112,12 +112,12 @@ object SolrQueryStringBuilder {
     case object Empty extends QueryPart
 
     private def valueEsc(value: FieldValueType): String = value match {
-        case s: String ⇒
+        case s: String =>
             if (s.contains(" "))
-                '"' + s + '"'
+                s""""$s""""
             else s
 
-        case _ ⇒ value.toString
+        case _ => value.toString
     }
 
     import scala.language.implicitConversions

@@ -39,26 +39,26 @@ class ConnectingStasher extends Actor {
     private var stashed = Map.empty[WaitingRequest, Cancellable]
 
     override def receive: Receive = {
-        case wr: WaitingRequest ⇒
+        case wr: WaitingRequest =>
             val t = context.system.scheduler.scheduleOnce(wr.timeoutRemaining, self, TimedOut(wr))
-            stashed += (wr → t)
+            stashed += (wr -> t)
 
-        case TimedOut(wr @ WaitingRequest(replyTo, _, _, origTimeout, _)) ⇒
+        case TimedOut(wr @ WaitingRequest(replyTo, _, _, origTimeout, _)) =>
             val msg = Status.Failure(Solr.ConnectionException(s"Connection not established within $origTimeout"))
             replyTo.tell(msg, context.parent)
             stashed -= wr
 
-        case ErrorOutAllWaiting(t) ⇒
+        case ErrorOutAllWaiting(t) =>
             val msg = Status.Failure(t)
             stashed.values foreach (_.cancel())
             stashed.keys foreach (_.sender.tell(msg, context.parent))
             stashed = Map.empty
 
-        case FlushWaitingRequests ⇒
+        case FlushWaitingRequests =>
             val now = System.nanoTime()
             stashed.values foreach (_.cancel())
             stashed.keys foreach {
-                case WaitingRequest(act, req, timeoutRemaining, origTimeout, recvd) ⇒
+                case WaitingRequest(act, req, timeoutRemaining, origTimeout, recvd) =>
                     sender() ! StashedRequest(act, req, timeoutRemaining - (now - recvd).nanos, origTimeout)
             }
             stashed = Map.empty

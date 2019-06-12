@@ -44,11 +44,11 @@ object ZkRequestHandler {
         lbConnection ! req
 
         def receive = {
-            case Status.Failure(t) ⇒
+            case Status.Failure(t) =>
                 context.parent ! LBReqFailure(server, t)
                 context stop self
 
-            case resp: LBClientConnection.ExtendedResponse ⇒
+            case resp: LBClientConnection.ExtendedResponse =>
                 context.parent ! LBReqSuccess(server, resp)
                 context stop self
         }
@@ -68,7 +68,7 @@ object ZkRequestHandler {
         private var remaining = info.routes
 
         info.routes foreach {
-            case (server, req) ⇒ context actorOf LBReqRunner.props(lbConnection, server, req)
+            case (server, req) => context actorOf LBReqRunner.props(lbConnection, server, req)
         }
 
         private def removeAndCheckComplete(server: String) = {
@@ -84,12 +84,12 @@ object ZkRequestHandler {
         }
 
         def receive = {
-            case LBReqFailure(server, t) ⇒
-                errors += (server → t)
+            case LBReqFailure(server, t) =>
+                errors += (server -> t)
                 removeAndCheckComplete(server)
 
-            case LBReqSuccess(server, resp) ⇒
-                responses += (server → resp)
+            case LBReqSuccess(server, resp) =>
+                responses += (server -> resp)
                 removeAndCheckComplete(server)
         }
     }
@@ -125,12 +125,12 @@ object ZkRequestHandler {
         }
 
         def receive = {
-            case fail: Status.Failure ⇒
+            case fail: Status.Failure =>
                 context.parent ! fail
                 context stop self
 
-            case resp: LBClientConnection.ExtendedResponse ⇒
-                responses += (currentServer → resp)
+            case resp: LBClientConnection.ExtendedResponse =>
+                responses += (currentServer -> resp)
                 runNext()
         }
     }
@@ -176,9 +176,9 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
 
     private def handleRegular(op: Solr.SolrOperation, collection: Option[String], isUpdateRequest: Boolean) = {
         zkUtil.getUrlsForNormalRequest(isUpdateRequest, collection, zkStateReader) match {
-            case Failure(t) ⇒ sendError(t)
-            case Success(urls) if urls.isEmpty ⇒ sendError(Solr.InvalidRequest("No URLs found for request"))
-            case Success(urls) ⇒
+            case Failure(t) => sendError(t)
+            case Success(urls) if urls.isEmpty => sendError(Solr.InvalidRequest("No URLs found for request"))
+            case Success(urls) =>
                 log.debug("Sending request to {}", urls)
                 lbConnection ! LBClientConnection.ExtendedRequest(op, urls.toList)
                 context become waitingForRegularResponse
@@ -186,13 +186,13 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
     }
 
     private def initiate(op: SolrOperation, collection: Option[String]) = op match {
-        case suo: Solr.SolrUpdateOperation ⇒
+        case suo: Solr.SolrUpdateOperation =>
             val clusterState = zkStateReader.getClusterState
 
             zkUpdateUtil.directUpdateRoutes(zkStateReader, suo, clusterState, collection, reqTimeout) match {
-                case Failure(t) ⇒ sendError(t)
-                case Success(None) ⇒ handleRegular(op, collection, isUpdateRequest = true)
-                case Success(Some(updateInfo)) ⇒
+                case Failure(t) => sendError(t)
+                case Success(None) => handleRegular(op, collection, isUpdateRequest = true)
+                case Success(Some(updateInfo)) =>
                     val startTime = System.nanoTime()
 
                     if (zkUtil.config.parallelUpdates)
@@ -203,32 +203,32 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
                     context become waitingForDirectUpdateResponse(op, updateInfo, startTime)
             }
 
-        case _ ⇒ handleRegular(op, collection, isUpdateRequest = false)
+        case _ => handleRegular(op, collection, isUpdateRequest = false)
     }
 
     private def handleTimeout: Receive = {
-        case TimedOut ⇒ sendError(Solr.RequestTimedOut(origTimeout))
+        case TimedOut => sendError(Solr.RequestTimedOut(origTimeout))
     }
 
     def receive = handleTimeout orElse {
-        case op: Solr.SolrOperation ⇒ initiate(op, None)
+        case op: Solr.SolrOperation => initiate(op, None)
 
-        case SolrCloudConnection.OperateOnCollection(op, collection) ⇒ initiate(op, Some(collection))
+        case SolrCloudConnection.OperateOnCollection(op, collection) => initiate(op, Some(collection))
     }
 
     def waitingForRegularResponse: Receive = handleTimeout orElse {
-        case Status.Failure(t) ⇒ sendError(t)
-        case LBClientConnection.ExtendedResponse(resp, _) ⇒
+        case Status.Failure(t) => sendError(t)
+        case LBClientConnection.ExtendedResponse(resp, _) =>
             replyTo.tell(resp, context.parent)
             context stop self
     }
 
     def waitingForDirectUpdateResponse(req: Solr.SolrOperation, updateInfo: DirectUpdateInfo,
                                        startTime: Long): Receive = {
-        case Status.Failure(t) ⇒ sendError(t)
-        case UpdatesResponse(shardResponses) ⇒ zkUpdateUtil.getNonRoutableUpdate(updateInfo, reqTimeout) match {
-            case None ⇒ handleCompleteUpdate(req, updateInfo, shardResponses, startTime)
-            case Some(lbReq) ⇒
+        case Status.Failure(t) => sendError(t)
+        case UpdatesResponse(shardResponses) => zkUpdateUtil.getNonRoutableUpdate(updateInfo, reqTimeout) match {
+            case None => handleCompleteUpdate(req, updateInfo, shardResponses, startTime)
+            case Some(lbReq) =>
                 lbConnection ! lbReq
                 context become waitingForRegularUpdateResponse(req, updateInfo, shardResponses, startTime)
         }
@@ -237,9 +237,9 @@ class ZkRequestHandler(lbConnection: ActorRef, zkStateReader: ZkStateReader, zkU
     def waitingForRegularUpdateResponse(req: Solr.SolrOperation, updateInfo: DirectUpdateInfo,
                                         shardResponses: Map[String, LBClientConnection.ExtendedResponse],
                                         startTime: Long): Receive = {
-        case Status.Failure(t) ⇒ sendError(t)
-        case r: LBClientConnection.ExtendedResponse ⇒
-            handleCompleteUpdate(req, updateInfo, shardResponses + (r.server → r), startTime)
+        case Status.Failure(t) => sendError(t)
+        case r: LBClientConnection.ExtendedResponse =>
+            handleCompleteUpdate(req, updateInfo, shardResponses + (r.server -> r), startTime)
     }
 }
 */

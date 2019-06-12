@@ -25,6 +25,8 @@ object Example extends App {
     val main = system.actorOf(Props[MyAct])
     system.actorOf(Props[WD])
 
+    private case object SendQuery
+
     private class MyAct extends Actor with ActorLogging {
         private var conn: ActorRef = _
 
@@ -35,7 +37,7 @@ object Example extends App {
 
             import context.dispatcher
 
-            context.system.scheduler.scheduleOnce(35.seconds, self, 'q)
+            context.system.scheduler.scheduleOnce(35.seconds, self, SendQuery)
             context.system.scheduler.scheduleOnce(2.minutes, self, PoisonPill)
 
             Solr.Client.clientTo(config.as[String]("solrAddr"))
@@ -55,14 +57,14 @@ object Example extends App {
         }
 
         def receive = {
-            case Solr.SolrConnection(a, c) ⇒
+            case Solr.SolrConnection(a, c) =>
                 log.info("Got {} for {} from {}", c, a, sender())
                 conn = sender()
                 sendQuery()
 
-            case 'q ⇒ sendQuery()
+            case SendQuery => sendQuery()
 
-            case m ⇒
+            case m =>
                 log.info("got {}", m)
         }
     }
@@ -70,7 +72,7 @@ object Example extends App {
     private class WD extends Actor {
         context watch main
         def receive = {
-            case Terminated(`main`) ⇒ system.terminate()
+            case Terminated(`main`) => system.terminate()
         }
     }
 }

@@ -12,9 +12,10 @@ import java.io.{BufferedWriter, OutputStreamWriter}
 import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.{SolrInputDocument, SolrInputField}
 
+import com.codemettle.akkasolr.CollectionConverters._
+
 import akka.http.scaladsl.model.{HttpCharsets, Uri}
 import akka.util.{ByteString, Helpers}
-import scala.collection.JavaConverters._
 
 /**
  * @author steven
@@ -36,7 +37,7 @@ object Util {
     }
 
     def actorNamer(prefix: String): Iterator[String] = {
-        (LongIterator from 0) map (i ⇒ s"$prefix${Helpers.base64(i)}")
+        (LongIterator from 0) map (i => s"$prefix${Helpers.base64(i)}")
     }
 
     def createUpdateRequest(docs: SolrInputDocument*): UpdateRequest = {
@@ -75,12 +76,12 @@ object Util {
     }
 
     def createSolrInputDocs(fieldMaps: Map[String, AnyRef]*): Seq[SolrInputDocument] = {
-        fieldMaps map (fieldMap ⇒ {
+        fieldMaps map (fieldMap => {
             val fields = fieldMap map {
-                case (name, value) ⇒
+                case (name, value) =>
                     val field = new SolrInputField(name)
                     field.setValue(value)
-                    name → field
+                    name -> field
             }
 
             new SolrInputDocument(fields.asJava)

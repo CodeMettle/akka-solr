@@ -7,11 +7,11 @@
  */
 package com.codemettle.akkasolr.solrtypes
 
-import com.codemettle.akkasolr.Solr
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.util.NamedList
 
-import scala.collection.JavaConverters._
+import com.codemettle.akkasolr.CollectionConverters._
+import com.codemettle.akkasolr.Solr
 
 /**
  * @author steven
@@ -26,10 +26,10 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
     lazy val results = AkkaSolrDocumentList(Option(original.getResults))
 
     @transient
-    lazy val facetFields = Option(original.getFacetFields) map (ffs ⇒ {
-        (ffs.asScala map (ff ⇒ {
-            ff.getName → {
-                (ff.getValues.asScala map (c ⇒ c.getName → c.getCount)).toMap
+    lazy val facetFields = Option(original.getFacetFields) map (ffs => {
+        (ffs.asScala map (ff => {
+            ff.getName -> {
+                (ff.getValues.asScala map (c => c.getName -> c.getCount)).toMap
             }
         })).toMap
     })
@@ -51,12 +51,12 @@ case class SolrQueryResponse(forRequest: Solr.SolrOperation, original: QueryResp
 
     @transient
     lazy val errorOpt: Option[NamedList[_]] = Option(original.getResponse.get("error")) collect {
-        case nl: NamedList[_] ⇒ nl
+        case nl: NamedList[_] => nl
     }
 
     @transient
-    lazy val errorMessageOpt: Option[String] = errorOpt.flatMap(nl ⇒ Option(nl.get("msg"))) collect {
-        case s: String ⇒ s
+    lazy val errorMessageOpt: Option[String] = errorOpt.flatMap(nl => Option(nl.get("msg"))) collect {
+        case s: String => s
     }
 
     @transient

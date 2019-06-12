@@ -15,7 +15,6 @@ import com.codemettle.akkasolr.util.ActorInputStream._
 import akka.actor._
 import akka.pattern._
 import akka.util.{ByteString, Timeout}
-import scala.compat.Platform
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -34,15 +33,15 @@ object ActorInputStream {
         private var finished = false
 
         def receive = {
-            case TriggerStreamComplete ⇒
+            case TriggerStreamComplete =>
                 finished = true
                 unstashAll()
 
-            case EnqueueBytes(bytes) ⇒
+            case EnqueueBytes(bytes) =>
                 byteStr ++= bytes
                 unstashAll()
 
-            case DequeueBytes(max) ⇒
+            case DequeueBytes(max) =>
                 if (byteStr.isEmpty && finished)
                     sender() ! DequeuedBytes(None)
                 else if (byteStr.isEmpty)
@@ -83,10 +82,10 @@ class ActorInputStream(implicit arf: ActorRefFactory) extends InputStream {
             0
         else {
             Await.result(buffer ? DequeueBytes(len), Duration.Inf) match {
-                case DequeuedBytes(None) ⇒ -1
-                case DequeuedBytes(Some(byteStr)) ⇒
+                case DequeuedBytes(None) => -1
+                case DequeuedBytes(Some(byteStr)) =>
                     val bytes = byteStr.toArray
-                    Platform.arraycopy(bytes, 0, b, off, bytes.length)
+                    System.arraycopy(bytes, 0, b, off, bytes.length)
                     bytes.length
             }
         }

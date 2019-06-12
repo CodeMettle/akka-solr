@@ -198,9 +198,9 @@ connection ! req
 // or
 Solr.Client.manager ! Solr.Request(solrUrl, req)
 def receive = {
-    case SolrResultInfo(numFound, start, maxScore) ⇒ // received first
-    case doc: AkkaSolrDocument ⇒ // documents are received
-    case res: SolrQueryResponse ⇒ // response is sent last and has no documents; (connection ? req) returns Future[SolrQueryResponse]
+    case SolrResultInfo(numFound, start, maxScore) => // received first
+    case doc: AkkaSolrDocument => // documents are received
+    case res: SolrQueryResponse => // response is sent last and has no documents; (connection ? req) returns Future[SolrQueryResponse]
 }
 
 ```

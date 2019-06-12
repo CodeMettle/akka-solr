@@ -42,6 +42,6 @@ class SolrCloudConnection(zkHost: String, config: Solr.SolrCloudConnectionOption
     private val sscc = context.actorOf(SolrServerClientConnection.props(solrClient), "sscc")
 
     override def receive: Receive = {
-        case req ⇒ sscc forward req
+        case req => sscc forward req
     }
 }

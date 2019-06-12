@@ -22,7 +22,7 @@ import scala.util.control.Exception.ultimately
  *
  */
 class TestConfigs extends FlatSpec with Matchers {
-    def withSystem(conf: Option[Config] = None, tests: (SysMat) ⇒ Unit = _ ⇒ {}) = {
+    def withSystem(conf: Option[Config] = None, tests: (SysMat) => Unit = _ => {}) = {
         val baseConf = ConfigFactory.load()
         implicit val system: ActorSystem =
             ActorSystem((Random.alphanumeric take 10).mkString, conf.fold(baseConf)(_ withFallback baseConf))
@@ -67,7 +67,7 @@ class TestConfigs extends FlatSpec with Matchers {
                                                               |  }
                                                               |}""".stripMargin
 
-    "Configs" should "have correct defaults" in withSystem(tests = { implicit sysmat ⇒
+    "Configs" should "have correct defaults" in withSystem(tests = { implicit sysmat =>
         val opts = Solr.RequestOptions.materialize(sysmat)
 
         opts should equal (Solr.RequestOptions(Solr.RequestMethods.POST, Solr.SolrResponseTypes.Binary, 1.minute))
@@ -87,25 +87,25 @@ class TestConfigs extends FlatSpec with Matchers {
             "id"))
     })
 
-    "Default Request Options" should "be overridable" in withSystem(Some(nonDefaultReqOpts), { implicit sysmat ⇒
+    "Default Request Options" should "be overridable" in withSystem(Some(nonDefaultReqOpts), { implicit sysmat =>
         val opts = Solr.RequestOptions.materialize(sysmat)
 
         opts should equal (Solr.RequestOptions(Solr.RequestMethods.GET, Solr.SolrResponseTypes.XML, 750.millis))
     })
 
-    "Default Update Options" should "be overridable" in withSystem(Some(nonDefaultUpdOpts), { implicit sysmat ⇒
+    "Default Update Options" should "be overridable" in withSystem(Some(nonDefaultUpdOpts), { implicit sysmat =>
         val updOpts = Solr.UpdateOptions.materialize(sysmat)
 
         updOpts should equal (Solr.UpdateOptions(commit = true, Some(10.seconds), overwrite = false, failOnNonZeroStatus = false))
     })
 
-    "Default LoadBalance connection Options" should "be overridable" in withSystem(Some(nonDefaultLbConnOpts), { implicit sysmat ⇒
+    "Default LoadBalance connection Options" should "be overridable" in withSystem(Some(nonDefaultLbConnOpts), { implicit sysmat =>
         val connOpts = Solr.LBConnectionOptions.materialize(sysmat)
 
         connOpts should equal(Solr.LBConnectionOptions(5.seconds, 10))
     })
 
-    "Default SolrCloud connection Options" should "be overridable" in withSystem(Some(nonDefaultCloudConnOpts), { implicit sysmat ⇒
+    "Default SolrCloud connection Options" should "be overridable" in withSystem(Some(nonDefaultCloudConnOpts), { implicit sysmat =>
         val connOpts = Solr.SolrCloudConnectionOptions.materialize(sysmat)
 
         connOpts should equal(Solr.SolrCloudConnectionOptions(1.minute, 1.hour, connectAtStart = false, Some("mycoll"),

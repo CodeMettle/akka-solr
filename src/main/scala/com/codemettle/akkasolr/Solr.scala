@@ -7,7 +7,7 @@
  */
 package com.codemettle.akkasolr
 
-import java.{lang ⇒ jl, util ⇒ ju}
+import java.{lang => jl, util => ju}
 
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION
 import org.apache.solr.client.solrj.request.UpdateRequest
@@ -221,9 +221,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def commit(c: Boolean): Update = copy(updateOptions = updateOptions.copy(commit = c))
 
         def commitWithin(c: Duration): Update = c match {
-            case fd: FiniteDuration ⇒ copy(updateOptions = updateOptions.copy(commitWithin = Some(fd)))
-            case _ if updateOptions.commitWithin.isEmpty ⇒ this
-            case _ ⇒ copy(updateOptions = updateOptions.copy(commitWithin = None))
+            case fd: FiniteDuration => copy(updateOptions = updateOptions.copy(commitWithin = Some(fd)))
+            case _ if updateOptions.commitWithin.isEmpty => this
+            case _ => copy(updateOptions = updateOptions.copy(commitWithin = None))
         }
 
         def overwrite(o: Boolean): Update = copy(updateOptions = updateOptions.copy(overwrite = o))
@@ -233,12 +233,12 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
         def withUpdateOptions(opts: UpdateOptions): Update = copy(updateOptions = opts)
 
         def basicUpdateRequest: UpdateRequest = {
-            import scala.collection.JavaConverters._
+            import CollectionConverters._
 
             val ur = new UpdateRequest
             updateOptions.commitWithin match {
-                case None ⇒ addDocs foreach (ur.add(_, updateOptions.overwrite))
-                case Some(cw) ⇒
+                case None => addDocs foreach (ur.add(_, updateOptions.overwrite))
+                case Some(cw) =>
                     val cwMillis = math.min(Int.MaxValue, cw.toMillis).toInt
                     ur.setCommitWithin(cwMillis)
                     addDocs foreach (ur.add(_, cwMillis, updateOptions.overwrite))
@@ -295,7 +295,7 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
          * Not really meant for full-fledged conversion, just a way to convert an UpdateRequest that was created by akka-solr
          */
         private[akkasolr] def apply(ur: UpdateRequest)(implicit arf: ActorRefFactory): Update = {
-            import scala.collection.JavaConverters._
+            import CollectionConverters._
 
             if (ur.getAction == ACTION.OPTIMIZE)
                 throw Solr.InvalidRequest("Solr.Update doesn't currently support optimizing; use Solr.Optimize")
@@ -305,11 +305,11 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
 
             def overwriteDisabled = {
                 Option(ur.getDocumentsMap).fold(false)(_.values().asScala forall {
-                    case null ⇒ false
-                    case docOpts ⇒ docOpts.asScala get UpdateRequest.OVERWRITE match {
-                        case None ⇒ false
-                        case Some(ow: jl.Boolean) ⇒ !ow
-                        case _ ⇒ false
+                    case null => false
+                    case docOpts => docOpts.asScala get UpdateRequest.OVERWRITE match {
+                        case None => false
+                        case Some(ow: jl.Boolean) => !ow
+                        case _ => false
                     }
                 })
             }
@@ -317,9 +317,9 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
             def commitWithinFromDocs = {
                 def commitWithinFromDocProps(props: ju.Map[String, AnyRef]) = {
                     Option(props) flatMap (_.asScala get UpdateRequest.COMMIT_WITHIN match {
-                        case None ⇒ None
-                        case Some(cw: jl.Integer) ⇒ Some(cw.intValue().millis)
-                        case _ ⇒ None
+                        case None => None
+                        case Some(cw: jl.Integer) => Some(cw.intValue().millis)
+                        case _ => None
                     })
                 }
 
@@ -467,8 +467,8 @@ object Solr extends ExtensionId[SolrExtImpl] with ExtensionIdProvider {
                                           parallelUpdates: Boolean,
                                           idField: String) {
         private def intDuration(fd: FiniteDuration) = fd.toMillis match {
-            case ms if ms > Int.MaxValue ⇒ sys.error(s"$fd is too large")
-            case ms ⇒ ms.toInt
+            case ms if ms > Int.MaxValue => sys.error(s"$fd is too large")
+            case ms => ms.toInt
         }
 
         require(zkConnectTimeout.toMillis < Int.MaxValue, "zookeeper-connect-timeout must be < ~24 days")

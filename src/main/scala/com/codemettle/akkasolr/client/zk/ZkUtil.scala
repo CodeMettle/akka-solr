@@ -37,18 +37,18 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
             if (clusterState.getCollectionsMap.asScala contains collectionName)
                 Success(Set(collectionName))
             else Option(reader.getAliases getCollectionAlias collectionName) match {
-                case None ⇒ Failure(Solr.InvalidRequest(s"Collection not found: $collectionName"))
-                case Some(alias) ⇒ Try(StrUtils.splitSmart(alias, ",", true).asScala.toSet)
+                case None => Failure(Solr.InvalidRequest(s"Collection not found: $collectionName"))
+                case Some(alias) => Try(StrUtils.splitSmart(alias, ",", true).asScala.toSet)
             }
         }
 
         // Extract each comma separated collection name and store in a List.
         val rawCollectionsList = Try(StrUtils.splitSmart(collection, ",", true).asScala.toSet)
 
-        rawCollectionsList flatMap (collectionNames ⇒ {
+        rawCollectionsList flatMap (collectionNames => {
             (Try(Set.empty[String]) /: collectionNames) {
-                case (f: Failure[_], _) ⇒ f
-                case (Success(acc), collectionName) ⇒ collectionsForCollectionName(collectionName) map (cs ⇒ acc ++ cs)
+                case (f: Failure[_], _) => f
+                case (Success(acc), collectionName) => collectionsForCollectionName(collectionName) map (cs => acc ++ cs)
             }
         })
     }
@@ -57,11 +57,11 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
                           clusterState: ClusterState): Try[Map[String, Slice]] = {
         def collection: Try[String] = {
             requestCollection orElse config.defaultCollection match {
-                case None ⇒
+                case None =>
                     Failure(Solr.InvalidRequest(
                         "No collection param specified on request and no default collection has been set"))
 
-                case Some(c) ⇒ Success(c)
+                case Some(c) => Success(c)
             }
         }
 
@@ -79,16 +79,16 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
         }
 
         def mapColSlices(colName: String, colSlices: Iterable[Slice]): Map[String, Slice] = {
-            (colSlices map (slice ⇒ s"${colName}_${slice.getName}" → slice)).toMap
+            (colSlices map (slice => s"${colName}_${slice.getName}" -> slice)).toMap
         }
 
-        collectionList flatMap (collections ⇒ {
+        collectionList flatMap (collections => {
             (Try(Map.empty[String, Slice]) /: collections) {
-                case (f: Failure[_], _) ⇒ f
-                case (Success(acc), collectionName) ⇒
+                case (f: Failure[_], _) => f
+                case (Success(acc), collectionName) =>
                     Option(clusterState getActiveSlices collectionName) map (_.asScala) match {
-                        case None ⇒ Failure(Solr.InvalidRequest(s"Could not find collection: $collectionName"))
-                        case Some(colSlices) ⇒ Success(acc ++ mapColSlices(collectionName, colSlices))
+                        case None => Failure(Solr.InvalidRequest(s"Could not find collection: $collectionName"))
+                        case Some(colSlices) => Success(acc ++ mapColSlices(collectionName, colSlices))
                     }
             }
         })
@@ -102,10 +102,10 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
             zk.createClusterStateWatchersAndUpdate()
             zk
         } transform(identity, {
-            case zke: ZooKeeperException ⇒ zke
-            case e@(_: InterruptedException | _: KeeperException | _: IOException | _: TimeoutException) ⇒
+            case zke: ZooKeeperException => zke
+            case e@(_: InterruptedException | _: KeeperException | _: IOException | _: TimeoutException) =>
                 new ZooKeeperException(SolrException.ErrorCode.SERVER_ERROR, "", e)
-            case t ⇒ t
+            case t => t
         })
     }
 
@@ -123,7 +123,7 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
             def extractUrlsFromSlice(leaders: Vector[String], replicas: Vector[String], nodes: Set[String],
                                      slice: Slice): (Vector[String], Vector[String], Set[String]) = {
                 ((leaders, replicas, nodes) /: slice.getReplicasMap.values().asScala) {
-                    case ((leaderAcc, replicaAcc, nodesAcc), replica) ⇒
+                    case ((leaderAcc, replicaAcc, nodesAcc), replica) =>
                         val coreNodeProps = new ZkCoreNodeProps(replica)
                         val node = coreNodeProps.getNodeName
                         if (!(liveNodes contains node) ||
@@ -143,7 +143,7 @@ case class ZkUtil(config: SolrCloudConnectionOptions)(implicit arf: ActorRefFact
 
             val (leaders, replicas, _) = ((Vector.empty[String], Vector.empty[String], Set.empty[String]) /:
                 slices.values) {
-                case ((leadAcc, replAcc, nodesAcc), slice) ⇒ extractUrlsFromSlice(leadAcc, replAcc, nodesAcc, slice)
+                case ((leadAcc, replAcc, nodesAcc), slice) => extractUrlsFromSlice(leadAcc, replAcc, nodesAcc, slice)
             }
 
             if (isUpdateRequest)

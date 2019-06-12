@@ -14,7 +14,6 @@ import org.scalatest._
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import akka.util.ByteString
-import scala.compat.Platform
 import scala.concurrent.{Future, blocking}
 import scala.util.Random
 
@@ -86,7 +85,7 @@ class TestActorInputStream(_system: ActorSystem) extends TestKit(_system) with F
                 val toread = 0x1000 + Random.nextInt(0x1000)
                 val count = bais.read(buf, 0, toread)
                 val toenqueue = new Array[Byte](count)
-                Platform.arraycopy(buf, 0, toenqueue, 0, count)
+                System.arraycopy(buf, 0, toenqueue, 0, count)
                 ais enqueueBytes ByteString(toenqueue)
                 Thread.sleep(250)
             }

@@ -1,4 +1,5 @@
 import SonatypeKeys._
+import sbt.CrossVersion
 
 // Metadata
 
@@ -16,7 +17,7 @@ organizationName := "CodeMettle, LLC"
 
 organizationHomepage := Some(url("http://www.codemettle.com"))
 
-licenses += ("Apache License, Version 2.0" → url("http://www.apache.org/licenses/LICENSE-2.0.html"))
+licenses += ("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
 scmInfo := Some(
     ScmInfo(url("https://github.com/CodeMettle/akka-solr"), "scm:git:https://github.com/CodeMettle/akka-solr.git",
@@ -64,8 +65,17 @@ libraryDependencies ++= Seq(
 
 scalacOptions += {
     CrossVersion partialVersion scalaVersion.value match {
-        case Some((x, y)) if x >= 2 && y >= 12 ⇒ "-target:jvm-1.8"
-        case _ ⇒ "-target:jvm-1.6"
+        case Some((x, y)) if x >= 2 && y >= 12 => "-target:jvm-1.8"
+        case _ => "-target:jvm-1.6"
+    }
+}
+
+unmanagedSourceDirectories in Compile ++= {
+    (unmanagedSourceDirectories in Compile).value.map { dir =>
+        CrossVersion.partialVersion(scalaVersion.value) match {
+            case Some((2, 13)) => file(dir.getPath ++ "-2.13+")
+            case _             => file(dir.getPath ++ "-2.13-")
+        }
     }
 }
 

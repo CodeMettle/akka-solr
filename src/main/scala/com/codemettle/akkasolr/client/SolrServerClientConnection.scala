@@ -12,13 +12,13 @@ import org.apache.solr.client.solrj.SolrClient
 import org.apache.solr.client.solrj.request.{SolrPing, UpdateRequest}
 import org.apache.solr.common.util.NamedList
 
+import com.codemettle.akkasolr.CollectionConverters._
 import com.codemettle.akkasolr.client.SolrServerClientConnection.ReqHandler
 import com.codemettle.akkasolr.solrtypes.SolrQueryResponse
 import com.codemettle.akkasolr.util.Util
 
 import akka.actor._
 import akka.pattern._
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
 /**
@@ -30,10 +30,12 @@ object SolrServerClientConnection {
         Props[SolrServerClientConnection](new SolrServerClientConnection(ss))
     }
 
+    private case object TimedOut
+
     private class ReqHandler(solrServer: SolrClient, req: Solr.SolrOperation, replyTo: ActorRef) extends Actor {
         import context.dispatcher
 
-        val timeout = actorSystem.scheduler.scheduleOnce(req.requestTimeout, self, 'timeout)
+        val timeout = actorSystem.scheduler.scheduleOnce(req.requestTimeout, self, TimedOut)
 
         override def preStart() = {
             super.preStart()
@@ -54,44 +56,44 @@ object SolrServerClientConnection {
 
         private def finish(respF: Future[SolrQueryResponse]) = {
             respF pipeTo replyTo
-            respF onComplete (_ ⇒ self ! PoisonPill)
+            respF onComplete (_ => self ! PoisonPill)
         }
 
-        private def runOp(op: ⇒ NamedList[AnyRef]) = {
-            finish(Future(op) map (r ⇒ SolrQueryResponse(req, r)))
+        private def runOp(op: => NamedList[AnyRef]) = {
+            finish(Future(op) map (r => SolrQueryResponse(req, r)))
         }
 
-        private def createUpdateOp(op: ⇒ NamedList[AnyRef])(implicit opts: Solr.UpdateOptions)=
-            Future(op).map(r ⇒ SolrQueryResponse(req, r)).failIfNeeded
+        private def createUpdateOp(op: => NamedList[AnyRef])(implicit opts: Solr.UpdateOptions)=
+            Future(op).map(r => SolrQueryResponse(req, r)).failIfNeeded
 
-        private def runUpdateOp(op: ⇒ NamedList[AnyRef])(implicit opts: Solr.UpdateOptions): Unit =
+        private def runUpdateOp(op: => NamedList[AnyRef])(implicit opts: Solr.UpdateOptions): Unit =
             finish(createUpdateOp(op))
 
         private def handleRequest(op: Solr.SolrOperation) = op match {
-            case Solr.Ping(act, _) ⇒
+            case Solr.Ping(act, _) =>
                 val ping = new SolrPing
                 act foreach {
-                    case Solr.Ping.Enable ⇒ ping.setActionEnable()
-                    case Solr.Ping.Disable ⇒ ping.setActionDisable()
+                    case Solr.Ping.Enable => ping.setActionEnable()
+                    case Solr.Ping.Disable => ping.setActionDisable()
                 }
 
                 runOp(solrServer request ping)
 
-            case Solr.Commit(waitSearch, soft, _) ⇒
+            case Solr.Commit(waitSearch, soft, _) =>
                 runOp(solrServer.commit(true, waitSearch, soft).getResponse)
 
-            case Solr.Optimize(waitSearch, maxSegs, _) ⇒
+            case Solr.Optimize(waitSearch, maxSegs, _) =>
                 runOp(solrServer.optimize(true, waitSearch, maxSegs).getResponse)
 
-            case Solr.Rollback(_) ⇒
+            case Solr.Rollback(_) =>
                 runOp(solrServer.rollback().getResponse)
 
-            case Solr.Select(query, _) ⇒
-                finish(Future(solrServer.query(query)) map (r ⇒ SolrQueryResponse(req, r)))
+            case Solr.Select(query, _) =>
+                finish(Future(solrServer.query(query)) map (r => SolrQueryResponse(req, r)))
 
-            case Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) ⇒
+            case Solr.Update(addDocs, deleteIds, deleteQueries, opts, _) =>
                 val ur = new UpdateRequest
-                opts.commitWithin foreach (cw ⇒ ur setCommitWithin cw.toMillis.toInt)
+                opts.commitWithin foreach (cw => ur setCommitWithin cw.toMillis.toInt)
                 addDocs foreach (ur.add(_, opts.overwrite))
                 if (deleteIds.nonEmpty)
                     ur.deleteById(deleteIds.asJava)
@@ -100,8 +102,8 @@ object SolrServerClientConnection {
 
                 if (opts.commit) {
                     // run update then commit then return update result
-                    val respF = createUpdateOp(solrServer request ur)(opts).flatMap { updateRes ⇒
-                        Future(solrServer.commit()).map(_ ⇒ updateRes)
+                    val respF = createUpdateOp(solrServer request ur)(opts).flatMap { updateRes =>
+                        Future(solrServer.commit()).map(_ => updateRes)
                     }
                     finish(respF)
                 } else
@@ -109,7 +111,7 @@ object SolrServerClientConnection {
         }
 
         def receive = {
-            case 'timeout ⇒ sendError(Solr.RequestTimedOut(req.requestTimeout))
+            case TimedOut => sendError(Solr.RequestTimedOut(req.requestTimeout))
         }
     }
 }
@@ -129,8 +131,8 @@ private[akkasolr] class SolrServerClientConnection(solrServer: SolrClient) exten
     }
 
     def receive = {
-        case op: Solr.SolrOperation ⇒ handleRequest(op)
+        case op: Solr.SolrOperation => handleRequest(op)
 
-        case m ⇒ sender() ! Status.Failure(Solr.InvalidRequest(m.toString))
+        case m => sender() ! Status.Failure(Solr.InvalidRequest(m.toString))
     }
 }

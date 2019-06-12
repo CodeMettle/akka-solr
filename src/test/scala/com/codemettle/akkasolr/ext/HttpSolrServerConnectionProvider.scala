@@ -25,7 +25,7 @@ class HttpSolrServerConnectionProvider extends ConnectionProvider {
     override def connectionActorProps(uri: Uri, username: Option[String], password: Option[String],
                                       system: ExtendedActorSystem)(implicit mat: Materializer): Props = {
         def httpSolrServer = {
-            def clientOpt = for (u ← username; p ← password) yield {
+            def clientOpt = for (u <- username; p <- password) yield {
                 val params = new ModifiableSolrParams
                 params.set(HttpClientUtil.PROP_MAX_CONNECTIONS, 128)
                 params.set(HttpClientUtil.PROP_MAX_CONNECTIONS_PER_HOST, 32)

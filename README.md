@@ -22,7 +22,7 @@ sbt:
 
 ```scala
 libraryDependencies ++= Seq(
-    "com.codemettle.akka-solr" %% "akka-solr" % "3.0.0",
+    "com.codemettle.akka-solr" %% "akka-solr" % "3.0.2",
     "org.apache.solr" % "solr-solrj" % "7.2.1" // later versions should work but are untested
 )
 ```
@@ -33,7 +33,7 @@ Maven:
 <dependency>
     <groupId>com.codemettle.akka-solr</groupId>
     <artifactId>akka-solr</artifactId>
-    <version>3.0.0</version>
+    <version>3.0.2</version>
 </dependency>
 <dependency>
     <groupId>org.apache.solr</groupId>
@@ -233,6 +233,8 @@ License
 Changelog
 ---------
 
+* **3.0.2**
+  * Build for Scala 2.13
 * **3.0.0**
   * Add update-defaults.fail-on-non-zero-status, set to true by default, which causes UpdateRequests to fail with a Solr.UpdateError if a non-zero status is returned to add/delete/commit requests
   * Upgrade SolrJ to version 7.2.1

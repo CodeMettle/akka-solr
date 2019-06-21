@@ -9,7 +9,7 @@
 object Versions {
     val akka = "2.5.23"
     val akkaHttp = "10.1.8"
-    val ficus = "1.4.7-SNAPSHOT"
+    val ficus = "1.4.7"
     val logback = "1.1.2"
     val scalaTest = "3.0.8"
     val slf4j = "1.7.25"
